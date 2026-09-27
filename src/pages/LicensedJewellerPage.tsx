@@ -1,15 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Store,
   Search,
-  MapPin,
-  ShieldCheck,
-  Calendar,
-  ExternalLink,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { NavRoute, LicensedJeweller } from '../types';
-import { LICENSED_JEWELLERS } from '../data/mockData';
+import { jewellersService } from '../services/jewellersService';
+import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 
 interface LicensedJewellerPageProps {
   onNavigate: (route: NavRoute, payload?: any) => void;
@@ -21,25 +19,32 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
   const [selectedMetal, setSelectedMetal] = useState('ALL');
+  const [jewellers, setJewellers] = useState<LicensedJeweller[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const states = ['ALL', 'Delhi', 'Karnataka', 'Telangana', 'Rajasthan'];
+  const states = ['ALL', 'Delhi', 'Karnataka', 'Telangana', 'Rajasthan', 'Maharashtra'];
   const metals = ['ALL', 'Gold', 'Silver', 'Both'];
 
-  const filteredJewellers = useMemo(() => {
-    return LICENSED_JEWELLERS.filter((j) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        j.jewellerName.toLowerCase().includes(q) ||
-        j.licenceNo.toLowerCase().includes(q) ||
-        j.city.toLowerCase().includes(q) ||
-        j.address.toLowerCase().includes(q);
+  const fetchJewellers = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await jewellersService.getJewellers({
+        query: searchQuery,
+        state: selectedState,
+        metal: selectedMetal,
+      });
+      setJewellers(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch licensed jewellers');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      const matchesState = selectedState === 'ALL' || j.state === selectedState;
-      const matchesMetal = selectedMetal === 'ALL' || j.metalCategory === selectedMetal;
-
-      return matchesSearch && matchesState && matchesMetal;
-    });
+  useEffect(() => {
+    fetchJewellers();
   }, [searchQuery, selectedState, selectedMetal]);
 
   return (
@@ -60,7 +65,7 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
           </h1>
         </div>
         <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-          Search officially published BIS licensed jewellers registered to sell hallmarked gold and silver artefacts in conformity with the BIS Act, 2016.
+          Published directory of jewellers holding valid BIS hallmarking registrations. Powered by <code>GET /api/jewellers</code>.
         </p>
 
         {/* Search */}
@@ -77,7 +82,7 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
           />
           <input
             type="text"
-            placeholder="Search by jeweller brand name, licence number (e.g., HM/C-...), city or address..."
+            placeholder="Search by jeweller brand name, licence number (HM/C-...), or city..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -117,7 +122,7 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Metal Category:</span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Category:</span>
             <select
               value={selectedMetal}
               onChange={(e) => setSelectedMetal(e.target.value)}
@@ -131,41 +136,51 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
             >
               {metals.map((m) => (
                 <option key={m} value={m}>
-                  {m === 'ALL' ? 'All Metals (Gold & Silver)' : m}
+                  {m === 'ALL' ? 'All Metals' : m}
                 </option>
               ))}
             </select>
           </div>
 
           <span style={{ fontSize: '12px', color: '#64748B', marginLeft: 'auto' }}>
-            Last Synchronized: <strong>26 Sept 2026</strong> • BIS Central Hallmarking Portal
+            Endpoint: <code>GET /api/jewellers</code>
           </span>
         </div>
       </div>
 
-      {/* Results Table */}
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Jeweller Entity Name</th>
-              <th>Licence / Registration No</th>
-              <th>City / State</th>
-              <th>Address</th>
-              <th>Metal Category</th>
-              <th>Status</th>
-              <th>Validity</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredJewellers.length === 0 ? (
+      {/* Content Area */}
+      {isLoading ? (
+        <LoadingSkeleton type="table" count={2} message="Loading licensed jewellers from GET /api/jewellers..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchJewellers} apiEndpoint="GET /api/jewellers" />
+      ) : jewellers.length === 0 ? (
+        <EmptyState
+          icon={Store}
+          title="No licensed jeweller records found"
+          description="Jeweller registration information will appear here once connected to GET /api/jewellers."
+          actionText="Clear Filters"
+          onAction={() => {
+            setSearchQuery('');
+            setSelectedState('ALL');
+            setSelectedMetal('ALL');
+          }}
+        />
+      ) : (
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#64748B' }}>
-                  No licensed jewellers found matching your search.
-                </td>
+                <th>Jeweller Entity Name</th>
+                <th>Licence Number</th>
+                <th>City / State</th>
+                <th>Address</th>
+                <th>Metal Category</th>
+                <th>Status</th>
+                <th>Validity</th>
               </tr>
-            ) : (
-              filteredJewellers.map((j) => (
+            </thead>
+            <tbody>
+              {jewellers.map((j) => (
                 <tr key={j.id}>
                   <td style={{ fontWeight: 700, color: '#2A3C5B' }}>{j.jewellerName}</td>
                   <td>
@@ -173,12 +188,8 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
                       {j.licenceNo}
                     </span>
                   </td>
-                  <td>
-                    {j.city}, {j.state}
-                  </td>
-                  <td style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px' }}>
-                    {j.address}
-                  </td>
+                  <td>{j.city}, {j.state}</td>
+                  <td style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px' }}>{j.address}</td>
                   <td>
                     <span className="badge badge-sky">{j.metalCategory}</span>
                   </td>
@@ -189,11 +200,11 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
                     {j.validTill}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

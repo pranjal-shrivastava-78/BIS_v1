@@ -1,17 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Scale,
   Search,
   Calendar,
-  ExternalLink,
-  ShieldCheck,
-  Building,
   RefreshCw,
-  SlidersHorizontal,
-  Clock,
 } from 'lucide-react';
 import { NavRoute, QcoRecord } from '../types';
-import { QCO_RECORDS } from '../data/mockData';
+import { qcoService } from '../services/qcoService';
+import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 
 interface QcoRegulationsPageProps {
   onNavigate: (route: NavRoute, payload?: any) => void;
@@ -23,6 +21,9 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMinistry, setSelectedMinistry] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [qcoRecords, setQcoRecords] = useState<QcoRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const ministries = [
     'ALL',
@@ -32,24 +33,25 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
     'Ministry of New and Renewable Energy (MNRE)',
   ];
 
-  const filteredQco = useMemo(() => {
-    return QCO_RECORDS.filter((item) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        item.product.toLowerCase().includes(q) ||
-        item.isNumber.toLowerCase().includes(q) ||
-        item.notificationNo.toLowerCase().includes(q) ||
-        item.ministry.toLowerCase().includes(q);
+  const fetchQco = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await qcoService.getQcoRecords({
+        query: searchQuery,
+        ministry: selectedMinistry,
+        status: selectedStatus,
+      });
+      setQcoRecords(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch QCO orders');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      const matchesMinistry =
-        selectedMinistry === 'ALL' || item.ministry === selectedMinistry;
-
-      const matchesStatus =
-        selectedStatus === 'ALL' || item.status === selectedStatus;
-
-      return matchesSearch && matchesMinistry && matchesStatus;
-    });
+  useEffect(() => {
+    fetchQco();
   }, [searchQuery, selectedMinistry, selectedStatus]);
 
   return (
@@ -81,7 +83,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
               </h1>
             </div>
             <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-              Structured, gazetted regulatory database indexing central government notifications that mandate BIS certification.
+              Structured database of gazetted central notifications. Powered by <code>GET /api/qco</code>.
             </p>
           </div>
 
@@ -99,9 +101,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
             }}
           >
             <RefreshCw size={14} color="#3A74C2" />
-            <span>
-              <strong>Last Synchronized:</strong> 26 Sept 2026 18:30 IST (Gazette Feed)
-            </span>
+            <span>Endpoint: <code>GET /api/qco</code></span>
           </div>
         </div>
 
@@ -119,7 +119,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
           />
           <input
             type="text"
-            placeholder="Search QCO by product name, IS standard number, ministry, or Gazette S.O. notification number..."
+            placeholder="Search QCO by product name, IS standard number, or Gazette notification number..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -180,29 +180,39 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
         </div>
       </div>
 
-      {/* Results Table */}
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Product / Description</th>
-              <th>Applicable IS Standard</th>
-              <th>Issuing Ministry</th>
-              <th>Gazette Notification</th>
-              <th>Enforcement Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredQco.length === 0 ? (
+      {/* Content Area */}
+      {isLoading ? (
+        <LoadingSkeleton type="table" count={3} message="Fetching QCO records from GET /api/qco..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchQco} apiEndpoint="GET /api/qco" />
+      ) : qcoRecords.length === 0 ? (
+        <EmptyState
+          icon={Scale}
+          title="No QCO records found"
+          description="Quality Control Order notifications will appear here once retrieved from GET /api/qco."
+          actionText="Reset Filters"
+          onAction={() => {
+            setSearchQuery('');
+            setSelectedMinistry('ALL');
+            setSelectedStatus('ALL');
+          }}
+        />
+      ) : (
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#64748B' }}>
-                  No Quality Control Orders found matching your criteria.
-                </td>
+                <th>Product / Scope</th>
+                <th>Standard</th>
+                <th>Ministry</th>
+                <th>Gazette S.O. Notification</th>
+                <th>Effective Date</th>
+                <th>Status</th>
+                <th>Guidance</th>
               </tr>
-            ) : (
-              filteredQco.map((qco) => (
+            </thead>
+            <tbody>
+              {qcoRecords.map((qco) => (
                 <tr key={qco.id}>
                   <td style={{ fontWeight: 700, color: '#2A3C5B', maxWidth: '280px' }}>
                     {qco.product}
@@ -210,12 +220,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
                   <td>
                     <span
                       onClick={() => onNavigate('standards-explorer', qco.isNumber)}
-                      style={{
-                        fontWeight: 700,
-                        color: '#3A74C2',
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                      }}
+                      style={{ fontWeight: 700, color: '#3A74C2', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                       {qco.isNumber}
                     </span>
@@ -225,9 +230,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
                     <div style={{ fontWeight: 600, color: '#2A3C5B', fontSize: '12.5px' }}>
                       {qco.notificationNo}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>
-                      Dated: {qco.notificationDate}
-                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748B' }}>Dated: {qco.notificationDate}</div>
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px' }}>
@@ -239,42 +242,20 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
                     <span className="badge badge-verified">{qco.status}</span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        onClick={() => onNavigate('certification', qco.isNumber)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ padding: '3px 8px', fontSize: '11.5px' }}
-                      >
-                        Certification
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => onNavigate('certification', qco.isNumber)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '3px 8px', fontSize: '11.5px' }}
+                    >
+                      Roadmap
+                    </button>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Statutory Guidance Note */}
-      <div
-        style={{
-          backgroundColor: '#FFFBEB',
-          border: '1px solid #FDE68A',
-          borderRadius: '8px',
-          padding: '14px 18px',
-          fontSize: '12.5px',
-          color: '#92400E',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '12px',
-        }}
-      >
-        <Scale size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-        <div>
-          <strong>Statutory Effect of Quality Control Orders:</strong> Once a QCO takes effect, sub-standard or non-certified goods cannot be manufactured, imported, stored, sold, or distributed in India without the BIS Standard Mark (ISI mark or CRS registration). Violations are punishable under the BIS Act, 2016.
+              ))}
+            </tbody>
+          </table>
         </div>
-      </div>
+      )}
     </div>
   );
 };

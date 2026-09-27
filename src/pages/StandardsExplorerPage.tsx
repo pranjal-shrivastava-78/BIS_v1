@@ -1,22 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   BookOpen,
-  Filter,
-  ExternalLink,
-  ShieldCheck,
-  AlertCircle,
-  FileText,
   SlidersHorizontal,
-  ChevronRight,
+  ExternalLink,
   Award,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 import { IndianStandard, NavRoute } from '../types';
-import { INDIAN_STANDARDS } from '../data/mockData';
+import { standardsService } from '../services/standardsService';
 import { Modal } from '../components/common/Modal';
-import { StatusBadge } from '../components/common/StatusBadge';
+import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 
 interface StandardsExplorerPageProps {
   initialSearch?: string;
@@ -30,6 +25,10 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedDepartment, setSelectedDepartment] = useState('ALL');
   const [onlyQcoMandatory, setOnlyQcoMandatory] = useState(false);
+  const [standards, setStandards] = useState<IndianStandard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [selectedStandard, setSelectedStandard] = useState<IndianStandard | null>(null);
   const [clauseSearchQuery, setClauseSearchQuery] = useState('');
 
@@ -43,41 +42,42 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
     'Metallurgical Engineering (MTD 10)',
   ];
 
-  const filteredStandards = useMemo(() => {
-    return INDIAN_STANDARDS.filter((std) => {
-      const query = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !query ||
-        std.isNumber.toLowerCase().includes(query) ||
-        std.title.toLowerCase().includes(query) ||
-        std.scope.toLowerCase().includes(query) ||
-        std.category.toLowerCase().includes(query);
+  const fetchStandards = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await standardsService.getStandards({
+        query: searchQuery,
+        department: selectedDepartment,
+        qcoOnly: onlyQcoMandatory,
+      });
+      setStandards(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load standards');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      const matchesDept =
-        selectedDepartment === 'ALL' || std.department === selectedDepartment;
-
-      const matchesQco = !onlyQcoMandatory || std.qcoMandatory;
-
-      return matchesSearch && matchesDept && matchesQco;
-    });
+  useEffect(() => {
+    fetchStandards();
   }, [searchQuery, selectedDepartment, onlyQcoMandatory]);
 
-  // Clause search filter inside modal
-  const filteredClauses = useMemo(() => {
-    if (!selectedStandard) return [];
-    if (!clauseSearchQuery.trim()) return selectedStandard.clauses;
-    const q = clauseSearchQuery.toLowerCase().trim();
-    return selectedStandard.clauses.filter(
-      (c) =>
-        c.clauseNumber.toLowerCase().includes(q) ||
-        c.title.toLowerCase().includes(q) ||
-        c.text.toLowerCase().includes(q)
-    );
-  }, [selectedStandard, clauseSearchQuery]);
+  const filteredClauses = selectedStandard
+    ? selectedStandard.clauses.filter((c) => {
+        if (!clauseSearchQuery.trim()) return true;
+        const q = clauseSearchQuery.toLowerCase().trim();
+        return (
+          c.clauseNumber.toLowerCase().includes(q) ||
+          c.title.toLowerCase().includes(q) ||
+          c.text.toLowerCase().includes(q)
+        );
+      })
+    : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Page Title & Search Header */}
+      {/* Search Header */}
       <div
         className="card"
         style={{
@@ -94,7 +94,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
             </h1>
           </div>
           <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-            Search over 25,000 gazetted Indian Standards. Inspect technical clauses, scope definitions, mandatory Quality Control Orders (QCO), and certification schemes.
+            Browse gazetted Indian Standards. Powered by <code>GET /api/standards</code>.
           </p>
         </div>
 
@@ -112,7 +112,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
           />
           <input
             type="text"
-            placeholder="Search by IS number (e.g., IS 17526), title, product (e.g., water bottle, toys), or keyword..."
+            placeholder="Search by IS number (e.g., IS 17526), title, product, or keyword..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -128,7 +128,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
           />
         </div>
 
-        {/* Filter Pills and Toggles */}
+        {/* Filters */}
         <div
           style={{
             display: 'flex',
@@ -149,7 +149,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 gap: '4px',
               }}
             >
-              <SlidersHorizontal size={14} /> Technical Committee:
+              <SlidersHorizontal size={14} /> Committee:
             </span>
             <select
               value={selectedDepartment}
@@ -161,7 +161,6 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 borderRadius: '6px',
                 backgroundColor: '#FFFFFF',
                 color: '#2A3C5B',
-                cursor: 'pointer',
               }}
             >
               {departments.map((dept) => (
@@ -191,59 +190,36 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
               type="checkbox"
               checked={onlyQcoMandatory}
               onChange={(e) => setOnlyQcoMandatory(e.target.checked)}
-              style={{ cursor: 'pointer' }}
             />
             <span>Show Only Mandatory QCO Standards</span>
           </label>
         </div>
       </div>
 
-      {/* Result Count and Grid */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '13.5px', color: '#475569' }}>
-          Showing <strong>{filteredStandards.length}</strong> Indian Standards matching filters
-        </div>
-        <button
-          onClick={() => onNavigate('product-to-standard')}
-          className="btn btn-secondary btn-sm"
-          style={{ fontSize: '12px' }}
-        >
-          Unsure of IS number? Use Product Mapping &rarr;
-        </button>
-      </div>
-
-      {filteredStandards.length === 0 ? (
-        <div
-          className="card"
-          style={{
-            padding: '48px 24px',
-            textAlign: 'center',
-            backgroundColor: '#FFFFFF',
-            color: '#64748B',
+      {/* Content Area */}
+      {isLoading ? (
+        <LoadingSkeleton type="card" count={2} message="Loading Indian Standards from GET /api/standards..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchStandards} apiEndpoint="GET /api/standards" />
+      ) : standards.length === 0 ? (
+        <EmptyState
+          icon={BookOpen}
+          title="No standards found"
+          description="Search for an Indian Standard, product, or keyword to explore applicable specifications."
+          actionText="Clear Search Filters"
+          onAction={() => {
+            setSearchQuery('');
+            setSelectedDepartment('ALL');
+            setOnlyQcoMandatory(false);
           }}
-        >
-          <BookOpen size={40} color="#B8D1F2" style={{ margin: '0 auto 12px' }} />
-          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#2A3C5B' }}>
-            No Matching Indian Standards Found
-          </h3>
-          <p style={{ fontSize: '13px', marginTop: '6px' }}>
-            Try broadening your search term or clearing the technical committee filter.
-          </p>
-          <button
-            onClick={() => {
-              setSearchQuery('');
-              setSelectedDepartment('ALL');
-              setOnlyQcoMandatory(false);
-            }}
-            className="btn btn-primary"
-            style={{ marginTop: '16px', marginInline: 'auto' }}
-          >
-            Reset Filters
-          </button>
-        </div>
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {filteredStandards.map((std) => (
+          <div style={{ fontSize: '13px', color: '#64748B' }}>
+            Found <strong>{standards.length}</strong> Indian Standards from API service
+          </div>
+
+          {standards.map((std) => (
             <div
               key={std.id}
               className="card"
@@ -252,7 +228,6 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 border: '1px solid #D6E4F8',
                 padding: '20px 24px',
                 borderRadius: '10px',
-                transition: 'all 0.15s ease',
               }}
             >
               <div
@@ -289,14 +264,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                       {std.certificationScheme}
                     </span>
                   </div>
-                  <h3
-                    style={{
-                      fontSize: '15.5px',
-                      fontWeight: 700,
-                      color: '#2A3C5B',
-                      marginBottom: '4px',
-                    }}
-                  >
+                  <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '4px' }}>
                     {std.title}
                   </h3>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
@@ -304,7 +272,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={() => {
                       setSelectedStandard(std);
@@ -323,7 +291,6 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 </div>
               </div>
 
-              {/* Scope Snippet */}
               <p
                 style={{
                   fontSize: '13px',
@@ -339,60 +306,33 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 <strong>Scope:</strong> {std.scope}
               </p>
 
-              {/* Clauses Preview and Quick Actions */}
               <div
                 style={{
                   display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '12px',
+                  alignItems: 'center',
                   fontSize: '12px',
                   color: '#64748B',
                   borderTop: '1px solid #EDF3FB',
                   paddingTop: '10px',
                 }}
               >
-                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                  <span>
-                    Indexed Clauses: <strong>{std.clauses.length}</strong>
-                  </span>
-                  <span>
-                    Amendments: <strong>{std.amendments.length}</strong>
-                  </span>
-                  {std.qcoDate && (
-                    <span style={{ color: '#B45309', fontWeight: 600 }}>
-                      QCO Date: {std.qcoDate}
-                    </span>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button
-                    onClick={() => {
-                      setSelectedStandard(std);
-                      setClauseSearchQuery('Clause');
-                    }}
-                    style={{ color: '#3A74C2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    Search Clauses &rarr;
-                  </button>
-                  <a
-                    href={std.bisSourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: '#39527B', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    BIS Portal <ExternalLink size={12} />
-                  </a>
-                </div>
+                <div>Clauses Indexed: <strong>{std.clauses.length}</strong></div>
+                <a
+                  href={std.bisSourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: '#3A74C2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  Official BIS Portal <ExternalLink size={12} />
+                </a>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Standard Details & Clause Search Modal */}
+      {/* Standard Detail Modal */}
       {selectedStandard && (
         <Modal
           isOpen={!!selectedStandard}
@@ -401,108 +341,36 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
           subtitle={selectedStandard.title}
           maxWidth="840px"
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {/* Metadata badges */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
               <span className="badge badge-verified">{selectedStandard.status}</span>
               {selectedStandard.qcoMandatory && (
                 <span className="badge badge-danger">QCO Mandatory Scheme</span>
               )}
               <span className="badge badge-sky">{selectedStandard.certificationScheme}</span>
-              <span style={{ fontSize: '12px', color: '#64748B', marginLeft: 'auto' }}>
-                Department: {selectedStandard.department}
-              </span>
             </div>
 
-            {/* Scope */}
             <div>
               <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
-                Full Standard Scope
+                Standard Scope
               </h4>
               <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6, backgroundColor: '#F8FAFD', padding: '12px', borderRadius: '6px', border: '1px solid #E2EAF5' }}>
                 {selectedStandard.scope}
               </p>
             </div>
 
-            {/* Clause-Level Search Engine (F17 requirement) */}
-            <div
-              style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #D6E4F8',
-                borderRadius: '8px',
-                padding: '16px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px',
-                }}
-              >
-                <div>
-                  <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#2A3C5B' }}>
-                    Clause-Level Retrieval Engine (F17)
-                  </h4>
-                  <p style={{ fontSize: '12px', color: '#64748B' }}>
-                    Inspect exact requirements by clause number or test parameter
-                  </p>
-                </div>
-                <span className="badge badge-source">Authoritative Excerpts</span>
-              </div>
-
-              {/* Clause search input */}
-              <div style={{ position: 'relative', width: '100%', marginBottom: '12px' }}>
-                <Search
-                  size={15}
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#3A74C2',
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="e.g., 'Clause 5.2' or 'migration' or 'drop test'..."
-                  value={clauseSearchQuery}
-                  onChange={(e) => setClauseSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    paddingLeft: '34px',
-                    paddingRight: '12px',
-                    height: '36px',
-                    fontSize: '12.5px',
-                    backgroundColor: '#F8FAFD',
-                    border: '1px solid #D6E4F8',
-                    borderRadius: '6px',
-                  }}
-                />
-              </div>
-
-              {/* Clauses List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+            {/* Clause Explorer */}
+            <div style={{ border: '1px solid #D6E4F8', borderRadius: '8px', padding: '16px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#2A3C5B', marginBottom: '8px' }}>
+                Indexed Clauses
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {filteredClauses.map((clause, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: '10px 12px',
-                      backgroundColor: '#F8FAFC',
-                      borderRadius: '6px',
-                      border: '1px solid #E2EAF5',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: '#3A74C2' }}>
-                        {clause.clauseNumber} — {clause.title}
-                      </span>
-                      <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
-                        {clause.page}
-                      </span>
+                  <div key={idx} style={{ padding: '8px 12px', backgroundColor: '#F8FAFC', borderRadius: '6px' }}>
+                    <div style={{ fontWeight: 700, color: '#3A74C2', fontSize: '13px' }}>
+                      {clause.clauseNumber} — {clause.title} ({clause.page})
                     </div>
-                    <p style={{ fontSize: '12.5px', color: '#334155', lineHeight: 1.5 }}>
+                    <p style={{ fontSize: '12.5px', color: '#334155', marginTop: '2px' }}>
                       {clause.text}
                     </p>
                   </div>
@@ -510,63 +378,17 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
               </div>
             </div>
 
-            {/* Amendments & Related Standards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              <div style={{ padding: '12px', backgroundColor: '#F8FAFD', borderRadius: '6px', border: '1px solid #E2EAF5' }}>
-                <h5 style={{ fontSize: '12.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
-                  Gazetted Amendments
-                </h5>
-                <ul style={{ fontSize: '12px', color: '#475569', paddingLeft: '18px' }}>
-                  {selectedStandard.amendments.map((a, idx) => (
-                    <li key={idx} style={{ marginBottom: '3px' }}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div style={{ padding: '12px', backgroundColor: '#F8FAFD', borderRadius: '6px', border: '1px solid #E2EAF5' }}>
-                <h5 style={{ fontSize: '12.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
-                  Referenced / Related Standards
-                </h5>
-                <ul style={{ fontSize: '12px', color: '#475569', paddingLeft: '18px' }}>
-                  {selectedStandard.relatedStandards.map((r, idx) => (
-                    <li key={idx} style={{ marginBottom: '3px' }}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Footer Action Bar inside Modal */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderTop: '1px solid #E2EAF5',
-                paddingTop: '14px',
-                marginTop: '6px',
-              }}
-            >
-              <a
-                href={selectedStandard.bisSourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-outline btn-sm"
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #E2EAF5', paddingTop: '12px' }}>
+              <button
+                onClick={() => {
+                  const id = selectedStandard.id;
+                  setSelectedStandard(null);
+                  onNavigate('certification', id);
+                }}
+                className="btn btn-primary btn-sm"
               >
-                Official BIS Portal Document <ExternalLink size={13} />
-              </a>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => {
-                    const stdId = selectedStandard.id;
-                    setSelectedStandard(null);
-                    onNavigate('certification', stdId);
-                  }}
-                  className="btn btn-primary btn-sm"
-                >
-                  <Award size={14} /> Open Certification Roadmap
-                </button>
-              </div>
+                Certification Guidance &rarr;
+              </button>
             </div>
           </div>
         </Modal>

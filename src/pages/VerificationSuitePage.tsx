@@ -2,17 +2,12 @@ import React, { useState } from 'react';
 import {
   ShieldCheck,
   Search,
-  CheckCircle2,
-  AlertCircle,
-  Building,
-  Award,
   ExternalLink,
-  Cpu,
-  Calendar,
-  Layers,
 } from 'lucide-react';
 import { NavRoute, LicenceVerificationResult, CrsVerificationResult } from '../types';
-import { MOCK_LICENCE_DATABASE, MOCK_CRS_DATABASE } from '../data/mockData';
+import { verificationService } from '../services/verificationService';
+import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { EmptyState } from '../components/common/EmptyState';
 
 interface VerificationSuitePageProps {
   onNavigate: (route: NavRoute, payload?: any) => void;
@@ -24,59 +19,35 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
   const [activeTab, setActiveTab] = useState<'LICENCE' | 'CRS'>('LICENCE');
 
   // Licence state
-  const [licenceInput, setLicenceInput] = useState('CM/L-7200142981');
-  const [licenceResult, setLicenceResult] = useState<LicenceVerificationResult | null>(
-    MOCK_LICENCE_DATABASE['CM/L-7200142981']
-  );
+  const [licenceInput, setLicenceInput] = useState('');
+  const [licenceResult, setLicenceResult] = useState<LicenceVerificationResult | null>(null);
   const [isVerifyingLicence, setIsVerifyingLicence] = useState(false);
 
   // CRS state
-  const [crsInput, setCrsInput] = useState('R-41001234');
-  const [crsResult, setCrsResult] = useState<CrsVerificationResult | null>(
-    MOCK_CRS_DATABASE['R-41001234']
-  );
+  const [crsInput, setCrsInput] = useState('');
+  const [crsResult, setCrsResult] = useState<CrsVerificationResult | null>(null);
   const [isVerifyingCrs, setIsVerifyingCrs] = useState(false);
 
-  const handleVerifyLicence = (query?: string) => {
-    const q = (query || licenceInput).trim();
-    if (!q) return;
+  const handleVerifyLicence = async () => {
+    const raw = licenceInput.trim();
+    if (!raw) return;
     setIsVerifyingLicence(true);
     setLicenceResult(null);
 
-    setTimeout(() => {
-      setIsVerifyingLicence(false);
-      if (MOCK_LICENCE_DATABASE[q]) {
-        setLicenceResult(MOCK_LICENCE_DATABASE[q]);
-      } else {
-        setLicenceResult({
-          licenceNo: q,
-          status: 'NOT_FOUND',
-          officialSource: 'BIS Manak Online Portal (e-BIS)',
-          verifiedAt: new Date().toLocaleTimeString(),
-        });
-      }
-    }, 450);
+    const result = await verificationService.verifyLicence(raw);
+    setLicenceResult(result);
+    setIsVerifyingLicence(false);
   };
 
-  const handleVerifyCrs = (query?: string) => {
-    const q = (query || crsInput).trim();
-    if (!q) return;
+  const handleVerifyCrs = async () => {
+    const raw = crsInput.trim();
+    if (!raw) return;
     setIsVerifyingCrs(true);
     setCrsResult(null);
 
-    setTimeout(() => {
-      setIsVerifyingCrs(false);
-      if (MOCK_CRS_DATABASE[q]) {
-        setCrsResult(MOCK_CRS_DATABASE[q]);
-      } else {
-        setCrsResult({
-          rNumber: q,
-          status: 'INVALID',
-          officialSource: 'MeitY-BIS Compulsory Registration Scheme (CRS Portal)',
-          verifiedAt: new Date().toLocaleTimeString(),
-        });
-      }
-    }, 450);
+    const result = await verificationService.verifyCrs(raw);
+    setCrsResult(result);
+    setIsVerifyingCrs(false);
   };
 
   return (
@@ -97,7 +68,7 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
           </h1>
         </div>
         <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-          Verify the operative status and scope of BIS Product Certification Licences (CM/L numbers) and Compulsory Registration Scheme (CRS R-numbers) for electronic products.
+          Connects to official BIS backend endpoints: <code>POST /api/verification/licence</code> and <code>POST /api/verification/crs</code>.
         </p>
 
         {/* Tab Switcher */}
@@ -136,7 +107,7 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#2A3C5B', marginBottom: '6px' }}>
-              Enter BIS Licence Number (CM/L - 7 or 8 digits)
+              Enter BIS Licence Number (CM/L)
             </h3>
             <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '14px' }}>
               The CM/L number is printed beneath the official ISI mark on consumer products and packaging:
@@ -159,59 +130,30 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                 }}
               />
               <button
-                onClick={() => handleVerifyLicence()}
-                disabled={isVerifyingLicence}
+                onClick={handleVerifyLicence}
+                disabled={isVerifyingLicence || !licenceInput.trim()}
                 className="btn btn-primary"
               >
-                {isVerifyingLicence ? 'Querying...' : 'Verify Licence'}
+                {isVerifyingLicence ? 'Checking...' : 'Verify Licence'}
               </button>
             </div>
 
-            {/* Presets */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Demo Records:</span>
-              <button
-                onClick={() => {
-                  setLicenceInput('CM/L-7200142981');
-                  handleVerifyLicence('CM/L-7200142981');
-                }}
-                className="btn btn-secondary btn-sm"
-              >
-                Milton Bottles (CM/L-7200142981 - Operative)
-              </button>
-              <button
-                onClick={() => {
-                  setLicenceInput('CM/L-8400031195');
-                  handleVerifyLicence('CM/L-8400031195');
-                }}
-                className="btn btn-secondary btn-sm"
-              >
-                Bisleri Water (CM/L-8400031195 - Operative)
-              </button>
-              <button
-                onClick={() => {
-                  setLicenceInput('CM/L-1122334455');
-                  handleVerifyLicence('CM/L-1122334455');
-                }}
-                className="btn btn-secondary btn-sm"
-              >
-                Expired Example (CM/L-1122334455)
-              </button>
+            <div style={{ fontSize: '12px', color: '#64748B' }}>
+              Endpoint: <code>POST /api/verification/licence</code>
             </div>
           </div>
 
-          {/* Result Card */}
-          {licenceResult && (
+          {/* Result or Empty State */}
+          {isVerifyingLicence ? (
+            <LoadingSkeleton type="detail" count={1} message="Querying BIS e-Manak licence directory..." />
+          ) : licenceResult ? (
             <div
               className="card"
               style={{
                 padding: '24px',
                 backgroundColor: '#FFFFFF',
                 border: '1px solid #D6E4F8',
-                borderLeft:
-                  licenceResult.status === 'OPERATIVE'
-                    ? '5px solid #166534'
-                    : '5px solid #DC2626',
+                borderLeft: '5px solid #D97706',
               }}
             >
               <div
@@ -226,74 +168,32 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
               >
                 <div>
                   <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
-                    LICENCE VERIFICATION RESULT
+                    QUERY IDENTIFIER
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: 800, color: '#2A3C5B' }}>
                     {licenceResult.licenceNo}
                   </div>
                 </div>
 
-                <span
-                  className={
-                    licenceResult.status === 'OPERATIVE'
-                      ? 'badge badge-verified'
-                      : 'badge badge-danger'
-                  }
-                  style={{ fontSize: '12px' }}
-                >
-                  {licenceResult.status === 'OPERATIVE'
-                    ? 'OPERATIVE (GENUINE ISI LICENCE)'
-                    : licenceResult.status}
+                <span className="badge badge-warning" style={{ fontSize: '12px' }}>
+                  {licenceResult.status}
                 </span>
               </div>
 
-              {licenceResult.status === 'OPERATIVE' || licenceResult.status === 'EXPIRED' ? (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                    gap: '16px',
-                    fontSize: '13px',
-                    marginBottom: '16px',
-                  }}
-                >
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Licensee Name:</span>
-                    <div style={{ fontWeight: 800, color: '#2A3C5B', fontSize: '14px' }}>
-                      {licenceResult.licenseeName}
-                    </div>
-                    <div style={{ color: '#3A74C2', fontWeight: 600 }}>Brand: {licenceResult.brand}</div>
-                  </div>
-
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Factory Location:</span>
-                    <div style={{ color: '#334155' }}>{licenceResult.factoryAddress}</div>
-                  </div>
-
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Product & Standard:</span>
-                    <div style={{ fontWeight: 700, color: '#2A3C5B' }}>{licenceResult.productName}</div>
-                    <div style={{ color: '#3A74C2', fontWeight: 700 }}>{licenceResult.isNumber}</div>
-                  </div>
-
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Validity & Scheme:</span>
-                    <div style={{ fontWeight: 700, color: licenceResult.status === 'OPERATIVE' ? '#166534' : '#DC2626' }}>
-                      Valid Till: {licenceResult.validTill}
-                    </div>
-                    <div style={{ color: '#64748B', fontSize: '12px' }}>{licenceResult.scheme}</div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ padding: '12px', backgroundColor: '#FEF2F2', color: '#991B1B', borderRadius: '6px', fontSize: '13px' }}>
-                  No active or past BIS licence record found matching "{licenceResult.licenceNo}". Verify that the number is entered correctly without typographical errors.
-                </div>
-              )}
+              <div style={{ padding: '12px', backgroundColor: '#FFFBEB', color: '#92400E', borderRadius: '6px', fontSize: '13px', marginBottom: '14px' }}>
+                No active or past BIS licence record confirmed by backend service. Backend verification endpoint: <code>{licenceResult.officialSource}</code>.
+              </div>
 
               <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '10px', fontSize: '11.5px', color: '#64748B' }}>
-                Verified via {licenceResult.officialSource} at {licenceResult.verifiedAt}
+                Query executed at {licenceResult.verifiedAt}
               </div>
             </div>
+          ) : (
+            <EmptyState
+              icon={ShieldCheck}
+              title="No verification result"
+              description="Enter a CM/L licence number to begin verification against the BIS database."
+            />
           )}
         </div>
       )}
@@ -303,10 +203,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#2A3C5B', marginBottom: '6px' }}>
-              Verify CRS R-Number (Compulsory Registration Scheme for Electronics & IT Goods)
+              Verify CRS R-Number
             </h3>
             <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '14px' }}>
-              Electronics items (batteries, laptops, adapters, LED lights) carry an R-number under MeitY-BIS Scheme II:
+              Electronics items carry an R-number under the Compulsory Registration Scheme (CRS):
             </p>
 
             <div style={{ display: 'flex', gap: '10px', maxWidth: '560px', marginBottom: '14px' }}>
@@ -326,47 +226,29 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                 }}
               />
               <button
-                onClick={() => handleVerifyCrs()}
-                disabled={isVerifyingCrs}
+                onClick={handleVerifyCrs}
+                disabled={isVerifyingCrs || !crsInput.trim()}
                 className="btn btn-primary"
               >
-                {isVerifyingCrs ? 'Querying...' : 'Verify R-Number'}
+                {isVerifyingCrs ? 'Checking...' : 'Verify R-Number'}
               </button>
             </div>
 
-            {/* Presets */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Demo Records:</span>
-              <button
-                onClick={() => {
-                  setCrsInput('R-41001234');
-                  handleVerifyCrs('R-41001234');
-                }}
-                className="btn btn-secondary btn-sm"
-              >
-                Samsung Batteries (R-41001234 - Active)
-              </button>
-              <button
-                onClick={() => {
-                  setCrsInput('R-41123456');
-                  handleVerifyCrs('R-41123456');
-                }}
-                className="btn btn-secondary btn-sm"
-              >
-                HP Power Adapters (R-41123456 - Active)
-              </button>
+            <div style={{ fontSize: '12px', color: '#64748B' }}>
+              Endpoint: <code>POST /api/verification/crs</code>
             </div>
           </div>
 
-          {/* CRS Result */}
-          {crsResult && (
+          {isVerifyingCrs ? (
+            <LoadingSkeleton type="detail" count={1} message="Checking MeitY-BIS CRS Portal..." />
+          ) : crsResult ? (
             <div
               className="card"
               style={{
                 padding: '24px',
                 backgroundColor: '#FFFFFF',
                 border: '1px solid #D6E4F8',
-                borderLeft: crsResult.status === 'ACTIVE' ? '5px solid #166534' : '5px solid #DC2626',
+                borderLeft: '5px solid #D97706',
               }}
             >
               <div
@@ -381,61 +263,28 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
               >
                 <div>
                   <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
-                    CRS VERIFICATION RESULT
+                    CRS QUERY STATUS
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: 800, color: '#2A3C5B' }}>
                     {crsResult.rNumber}
                   </div>
                 </div>
 
-                <span
-                  className={crsResult.status === 'ACTIVE' ? 'badge badge-verified' : 'badge badge-danger'}
-                  style={{ fontSize: '12px' }}
-                >
-                  {crsResult.status === 'ACTIVE' ? 'ACTIVE REGISTRATION (VALID CRS)' : crsResult.status}
+                <span className="badge badge-warning" style={{ fontSize: '12px' }}>
+                  {crsResult.status}
                 </span>
               </div>
 
-              {crsResult.status === 'ACTIVE' && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                    gap: '16px',
-                    fontSize: '13px',
-                    marginBottom: '16px',
-                  }}
-                >
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Registered Brand Owner:</span>
-                    <div style={{ fontWeight: 800, color: '#2A3C5B', fontSize: '14px' }}>
-                      {crsResult.companyName}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Product Category:</span>
-                    <div style={{ color: '#334155' }}>{crsResult.productCategory}</div>
-                  </div>
-
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Indian Standard:</span>
-                    <div style={{ fontWeight: 700, color: '#3A74C2' }}>{crsResult.isStandard}</div>
-                  </div>
-
-                  <div>
-                    <span style={{ color: '#64748B', fontSize: '11.5px' }}>Covered Model Numbers:</span>
-                    <div style={{ color: '#2A3C5B', fontWeight: 600 }}>
-                      {crsResult.modelNumbers?.join(', ')}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '10px', fontSize: '11.5px', color: '#64748B' }}>
-                Verified via {crsResult.officialSource} • Timestamp: {crsResult.verifiedAt}
+              <div style={{ padding: '12px', backgroundColor: '#FFFBEB', color: '#92400E', borderRadius: '6px', fontSize: '13px' }}>
+                Service response: Registration details pending backend service integration at <code>{crsResult.officialSource}</code>.
               </div>
             </div>
+          ) : (
+            <EmptyState
+              icon={ShieldCheck}
+              title="No verification result"
+              description="Enter an R-number to begin verification."
+            />
           )}
         </div>
       )}

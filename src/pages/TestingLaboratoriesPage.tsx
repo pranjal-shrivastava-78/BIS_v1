@@ -1,19 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FlaskConical,
   Search,
   MapPin,
-  Phone,
-  Mail,
-  ShieldCheck,
-  Calendar,
   ExternalLink,
   SlidersHorizontal,
-  Navigation,
 } from 'lucide-react';
 import { NavRoute, TestingLab } from '../types';
-import { TESTING_LABS } from '../data/mockData';
+import { laboratoriesService } from '../services/laboratoriesService';
 import { Modal } from '../components/common/Modal';
+import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 
 interface TestingLaboratoriesPageProps {
   initialFilter?: { standard?: string };
@@ -27,27 +25,33 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
   const [searchQuery, setSearchQuery] = useState(initialFilter?.standard || '');
   const [selectedState, setSelectedState] = useState('ALL');
   const [selectedCapability, setSelectedCapability] = useState('ALL');
+  const [labs, setLabs] = useState<TestingLab[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLab, setSelectedLab] = useState<TestingLab | null>(null);
 
-  const states = ['ALL', 'Delhi', 'Uttar Pradesh', 'Maharashtra', 'Karnataka'];
+  const states = ['ALL', 'Delhi', 'Uttar Pradesh', 'Maharashtra', 'Karnataka', 'Tamil Nadu', 'Gujarat'];
   const capabilities = ['ALL', 'Chemical', 'Mechanical', 'Electrical', 'Microbiological', 'Precious Metals'];
 
-  const filteredLabs = useMemo(() => {
-    return TESTING_LABS.filter((lab) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        lab.name.toLowerCase().includes(q) ||
-        lab.code.toLowerCase().includes(q) ||
-        lab.city.toLowerCase().includes(q) ||
-        lab.accreditedStandards.some((s) => s.toLowerCase().includes(q));
+  const fetchLabs = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await laboratoriesService.getLaboratories({
+        query: searchQuery,
+        state: selectedState,
+        capability: selectedCapability,
+      });
+      setLabs(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch testing laboratories');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      const matchesState = selectedState === 'ALL' || lab.state === selectedState;
-      const matchesCap =
-        selectedCapability === 'ALL' || lab.capabilities.includes(selectedCapability);
-
-      return matchesSearch && matchesState && matchesCap;
-    });
+  useEffect(() => {
+    fetchLabs();
   }, [searchQuery, selectedState, selectedCapability]);
 
   return (
@@ -68,7 +72,7 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
           </h1>
         </div>
         <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-          Locate BIS central, regional, and recognized private testing laboratories authorized to perform conformity testing under the Laboratory Recognition Scheme (LRS).
+          Locate BIS central and accredited testing laboratories. Powered by <code>GET /api/laboratories</code>.
         </p>
 
         {/* Search */}
@@ -104,7 +108,7 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
         {/* Filters */}
         <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>State/Territory:</span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>State:</span>
             <select
               value={selectedState}
               onChange={(e) => setSelectedState(e.target.value)}
@@ -118,7 +122,7 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
             >
               {states.map((s) => (
                 <option key={s} value={s}>
-                  {s === 'ALL' ? 'All States' : s}
+                  {s === 'ALL' ? 'All States / UTs' : s}
                 </option>
               ))}
             </select>
@@ -146,105 +150,119 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
           </div>
 
           <span style={{ fontSize: '12px', color: '#64748B', marginLeft: 'auto' }}>
-            Source: <strong>BIS LIMS Portal</strong> • Synchronized 26 Sept 2026
+            Endpoint: <code>GET /api/laboratories</code>
           </span>
         </div>
       </div>
 
-      {/* Lab Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '16px' }}>
-        {filteredLabs.map((lab) => (
-          <div
-            key={lab.id}
-            className="card"
-            style={{
-              padding: '20px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #D6E4F8',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span className="badge badge-sky" style={{ fontSize: '11px' }}>
-                  {lab.code}
-                </span>
-                <span className="badge badge-verified" style={{ fontSize: '11px' }}>
-                  {lab.status}
-                </span>
-              </div>
-
-              <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
-                {lab.name}
-              </h3>
-
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12.5px', color: '#64748B', marginBottom: '10px' }}>
-                <MapPin size={15} style={{ flexShrink: 0, marginTop: '2px', color: '#3A74C2' }} />
-                <span>{lab.address}</span>
-              </div>
-
-              {/* Capabilities pills */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
-                {lab.capabilities.map((cap, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      fontSize: '11px',
-                      backgroundColor: '#F1F6FD',
-                      color: '#39527B',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid #E2EAF5',
-                    }}
-                  >
-                    {cap}
-                  </span>
-                ))}
-              </div>
-
-              {/* Accredited Standards */}
-              <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px' }}>
-                <strong>Accredited Standards: </strong>
-                {lab.accreditedStandards.join(', ')}
-              </div>
-            </div>
-
+      {/* Content Area */}
+      {isLoading ? (
+        <LoadingSkeleton type="card" count={2} message="Loading laboratories from GET /api/laboratories..." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={fetchLabs} apiEndpoint="GET /api/laboratories" />
+      ) : labs.length === 0 ? (
+        <EmptyState
+          icon={FlaskConical}
+          title="No laboratory data available"
+          description="Laboratory information will appear here once the service is connected to the BIS LIMS database."
+          actionText="Clear Filters"
+          onAction={() => {
+            setSearchQuery('');
+            setSelectedState('ALL');
+            setSelectedCapability('ALL');
+          }}
+        />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '16px' }}>
+          {labs.map((lab) => (
             <div
+              key={lab.id}
+              className="card"
               style={{
+                padding: '20px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #D6E4F8',
                 display: 'flex',
+                flexDirection: 'column',
                 justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingTop: '12px',
-                borderTop: '1px solid #EDF3FB',
-                fontSize: '12px',
               }}
             >
-              <span style={{ color: '#166534', fontWeight: 600 }}>
-                Valid till: {lab.validity}
-              </span>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span className="badge badge-sky" style={{ fontSize: '11px' }}>
+                    {lab.code}
+                  </span>
+                  <span className="badge badge-verified" style={{ fontSize: '11px' }}>
+                    {lab.status}
+                  </span>
+                </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+                <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
+                  {lab.name}
+                </h3>
+
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12.5px', color: '#64748B', marginBottom: '10px' }}>
+                  <MapPin size={15} style={{ flexShrink: 0, marginTop: '2px', color: '#3A74C2' }} />
+                  <span>{lab.address}</span>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                  {lab.capabilities.map((cap, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        fontSize: '11px',
+                        backgroundColor: '#F1F6FD',
+                        color: '#39527B',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #E2EAF5',
+                      }}
+                    >
+                      {cap}
+                    </span>
+                  ))}
+                </div>
+
+                <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px' }}>
+                  <strong>Accredited Standards: </strong>
+                  {lab.accreditedStandards.join(', ')}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: '12px',
+                  borderTop: '1px solid #EDF3FB',
+                  fontSize: '12px',
+                }}
+              >
+                <span style={{ color: '#166534', fontWeight: 600 }}>
+                  Valid till: {lab.validity}
+                </span>
+
                 <button
                   onClick={() => setSelectedLab(lab)}
                   className="btn btn-primary btn-sm"
                 >
-                  View Full Scope
+                  View Details
                 </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Lab Detail Modal */}
+      {/* Lab Modal */}
       {selectedLab && (
         <Modal
           isOpen={!!selectedLab}
           onClose={() => setSelectedLab(null)}
           title={selectedLab.name}
-          subtitle={`Recognition Code: ${selectedLab.code} • Status: ${selectedLab.status}`}
+          subtitle={`Recognition Code: ${selectedLab.code}`}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13px' }}>
             <div style={{ padding: '12px', backgroundColor: '#F8FAFD', borderRadius: '6px', border: '1px solid #E2EAF5' }}>
@@ -257,9 +275,7 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
             </div>
 
             <div>
-              <div style={{ fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
-                Accredited Testing Capabilities & Scopes
-              </div>
+              <div style={{ fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>Accredited Capabilities</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                 {selectedLab.capabilities.map((c, i) => (
                   <span key={i} className="badge badge-sky">{c}</span>
@@ -268,20 +284,12 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
             </div>
 
             <div>
-              <div style={{ fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
-                Covered Indian Standards
-              </div>
+              <div style={{ fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>Tested Standards</div>
               <ul style={{ paddingLeft: '18px', color: '#475569', lineHeight: 1.6 }}>
                 {selectedLab.accreditedStandards.map((std, i) => (
-                  <li key={i}>
-                    <strong>{std}</strong> — Official conformity and sample audit testing
-                  </li>
+                  <li key={i}><strong>{std}</strong></li>
                 ))}
               </ul>
-            </div>
-
-            <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '10px', fontSize: '11.5px', color: '#64748B' }}>
-              <span>Official Registry: {selectedLab.officialSource} • Last Verified: {selectedLab.lastVerified}</span>
             </div>
           </div>
         </Modal>
