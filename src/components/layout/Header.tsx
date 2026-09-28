@@ -2,15 +2,20 @@ import React, { useState } from 'react';
 import {
   Search,
   Bell,
-  Globe,
   HelpCircle,
   Menu,
   X,
   User,
   ExternalLink,
   ShieldAlert,
+  ChevronDown,
+  Phone,
+  Mail,
+  Building2,
+  FileCheck,
 } from 'lucide-react';
 import { NavRoute, Language } from '../../types';
+import { BisLogo } from '../common/BisLogo';
 
 interface HeaderProps {
   currentRoute: NavRoute;
@@ -31,214 +36,242 @@ export const Header: React.FC<HeaderProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState<'signin' | 'register' | null>(null);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     const query = searchQuery.trim().toLowerCase();
+
     if (query.includes('huid') || query.includes('gold') || query.includes('hallmark')) {
-      onNavigate('hallmarking-jewellery');
+      onNavigate('/hallmarking', { search: query });
     } else if (query.includes('lab') || query.includes('test')) {
-      onNavigate('testing-laboratories');
+      onNavigate('/laboratories', { search: query });
     } else if (query.includes('qco') || query.includes('mandat')) {
-      onNavigate('qco-regulations');
-    } else if (query.includes('certif') || query.includes('isi')) {
-      onNavigate('certification');
-    } else if (query.includes('licence') || query.includes('cm/l') || query.includes('crs')) {
-      onNavigate('verification-suite');
+      onNavigate('/qco-regulations', { search: query });
+    } else if (query.includes('certif') || query.includes('isi') || query.includes('scheme')) {
+      onNavigate('/certification', { search: query });
+    } else if (query.includes('product') || query.includes('bottle') || query.includes('toy')) {
+      onNavigate('/product-to-standard', { search: query });
     } else {
-      onNavigate('standards-explorer', query);
+      onNavigate('/standards', query);
     }
     setSearchQuery('');
   };
 
   return (
     <>
-      {/* Top Government Metadata Bar - matching reference aesthetic */}
+      {/* Top Institutional Metadata Bar */}
       <div
         style={{
-          backgroundColor: '#2A3C5B',
+          backgroundColor: '#1D2B42',
           color: '#E2EAF5',
           fontSize: '11.5px',
-          padding: '5px 24px',
+          padding: '5px 32px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          justifyContent: 'flex-end',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          width: '100%',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span>📅 27 Sept 2026 • 07:30 PM IST</span>
-          <span style={{ color: '#92BBF8', fontWeight: 600 }}>
-            GOVERNMENT OF INDIA • MINISTRY OF CONSUMER AFFAIRS, FOOD & PUBLIC DISTRIBUTION
-          </span>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Globe size={13} color="#92BBF8" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ color: '#E2EAF5', fontWeight: 500 }}>
+            BIS CARE Helpline: <strong style={{ color: '#FFFFFF', fontWeight: 600 }}>1800-11-8004</strong>
+          </span>
+          <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>|</span>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: '1px solid rgba(255, 255, 255, 0.18)',
+            }}
+          >
+            <span style={{ fontSize: '12px' }}>🌐</span>
             <select
               value={language}
               onChange={(e) => onLanguageChange(e.target.value as Language)}
+              aria-label="Select Language"
               style={{
                 backgroundColor: 'transparent',
-                color: '#FFFFFF',
                 border: 'none',
                 fontSize: '11.5px',
+                fontWeight: 600,
+                color: '#FFFFFF',
                 cursor: 'pointer',
                 outline: 'none',
-                fontWeight: 600,
               }}
             >
-              <option value="en" style={{ color: '#1E293B' }}>English</option>
-              <option value="hi" style={{ color: '#1E293B' }}>हिंदी (Hindi)</option>
-              <option value="ta" style={{ color: '#1E293B' }}>தமிழ் (Tamil)</option>
-              <option value="bn" style={{ color: '#1E293B' }}>বাংলা (Bengali)</option>
-              <option value="mr" style={{ color: '#1E293B' }}>मराठी (Marathi)</option>
+              <option value="en" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>English (English)</option>
+              <option value="hi" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>हिंदी (Hindi)</option>
+              <option value="ta" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>தமிழ் (Tamil)</option>
+              <option value="bn" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>বাংলা (Bengali)</option>
+              <option value="mr" style={{ color: '#1E293B', backgroundColor: '#FFFFFF' }}>मराठी (Marathi)</option>
             </select>
           </div>
-          <span style={{ opacity: 0.4 }}>|</span>
-          <span style={{ color: '#92BBF8', fontWeight: 600 }}>National Standards Portal (e-Manak)</span>
         </div>
       </div>
 
-      {/* Main Top Header */}
+      {/* Primary Sticky Top Navigation Bar matching reference layout */}
       <header
         style={{
-          height: '64px',
+          height: '70px',
           backgroundColor: '#FFFFFF',
           borderBottom: '1px solid #D6E4F8',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: '0 28px',
           position: 'sticky',
           top: 0,
-          zIndex: 90,
-          boxShadow: '0 1px 4px rgba(57, 82, 123, 0.04)',
+          zIndex: 100,
+          boxShadow: '0 2px 8px rgba(30, 41, 59, 0.04)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        {/* LEFT SIDE: BIS Logo & Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <button
             onClick={onToggleMobileMenu}
             aria-label="Toggle Navigation Menu"
             style={{
-              display: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               padding: '6px',
-              borderRadius: '6px',
-              color: '#39527B',
+              borderRadius: '8px',
+              backgroundColor: isMobileMenuOpen ? '#EAF2FE' : '#F8FAFD',
+              border: '1px solid #D6E4F8',
+              color: '#1D2B42',
+              cursor: 'pointer',
             }}
-            className="mobile-menu-toggle"
+            className="menu-drawer-toggle"
           >
-            {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
           <div
-            onClick={() => onNavigate('dashboard')}
+            onClick={() => onNavigate('/')}
             style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
           >
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                backgroundColor: '#39527B',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#92BBF8',
-                fontWeight: 800,
-                fontSize: '18px',
-                border: '1px solid #92BBF8',
-              }}
-            >
-              🏛️
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BisLogo size={36} />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span
                   style={{
                     fontFamily: 'var(--font-heading)',
-                    fontSize: '16px',
+                    fontSize: '17px',
                     fontWeight: 800,
-                    color: '#2A3C5B',
+                    color: '#1D2B42',
                     letterSpacing: '-0.02em',
                   }}
                 >
-                  BIS Intelligent Assistant
+                  BIS
                 </span>
                 <span
                   style={{
-                    backgroundColor: '#EAF2FE',
-                    color: '#3A74C2',
-                    fontSize: '10.5px',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '17px',
                     fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    border: '1px solid #C4DCFA',
+                    color: '#3A74C2',
+                    letterSpacing: '-0.01em',
                   }}
                 >
-                  SIH 26107
+                  Intelligent Assistant
                 </span>
               </div>
-              <p style={{ fontSize: '11px', color: '#64748B', lineHeight: 1.1 }}>
-                Bureau of Indian Standards • Standard & Regulatory Knowledge Engine
-              </p>
+              <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 500, lineHeight: 1.1 }}>
+                Bureau of Indian Standards
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Global Fast Search Bar */}
-        <form
-          onSubmit={handleSearchSubmit}
+        {/* CENTER: Large Global Search Bar */}
+        <div
+          className="header-center-container"
           style={{
-            position: 'relative',
-            width: '100%',
-            maxWidth: '460px',
-            margin: '0 20px',
+            display: 'flex',
+            alignItems: 'center',
+            flex: 1,
+            maxWidth: '560px',
+            margin: '0 24px',
           }}
         >
-          <Search
-            size={16}
+          {/* Global Search Bar */}
+          <form
+            onSubmit={handleSearchSubmit}
             style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#3A74C2',
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Search IS numbers, products, HUID, labs, QCOs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
+              position: 'relative',
               width: '100%',
-              height: '38px',
-              paddingLeft: '38px',
-              paddingRight: '12px',
-              fontSize: '13px',
-              backgroundColor: '#F7FAFD',
-              border: '1px solid #D6E4F8',
-              borderRadius: '20px',
             }}
-          />
-        </form>
+          >
+            <Search
+              size={17}
+              style={{
+                position: 'absolute',
+                left: '14px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#3A74C2',
+              }}
+            />
+            <input
+              type="text"
+              placeholder="Search IS numbers, products, HUID, labs, QCOs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                height: '42px',
+                paddingLeft: '40px',
+                paddingRight: '14px',
+                fontSize: '13.5px',
+                backgroundColor: '#F8FAFD',
+                border: '1px solid #D0E2FB',
+                borderRadius: '24px',
+                color: '#1E293B',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
+              }}
+            />
+          </form>
+        </div>
 
-        {/* Right Header Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Notifications */}
+        {/* RIGHT SIDE: Action Icons + Sign In & Register Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          {/* Quick Search Button */}
+          <button
+            onClick={() => onNavigate('/standards')}
+            title="Catalogue Search"
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '50%',
+              backgroundColor: '#F8FAFD',
+              border: '1px solid #D6E4F8',
+              color: '#39527B',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Search size={18} />
+          </button>
+
+          {/* Notifications Bell */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               title="Notifications"
               style={{
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '50%',
-                backgroundColor: showNotifications ? '#EAF2FE' : '#F7FAFD',
+                backgroundColor: showNotifications ? '#EAF2FE' : '#F8FAFD',
                 border: '1px solid #D6E4F8',
                 color: '#39527B',
                 display: 'flex',
@@ -247,14 +280,14 @@ export const Header: React.FC<HeaderProps> = ({
                 position: 'relative',
               }}
             >
-              <Bell size={17} />
+              <Bell size={18} />
               <span
                 style={{
                   position: 'absolute',
-                  top: '6px',
-                  right: '6px',
-                  width: '7px',
-                  height: '7px',
+                  top: '7px',
+                  right: '7px',
+                  width: '8px',
+                  height: '8px',
                   borderRadius: '50%',
                   backgroundColor: '#3A74C2',
                 }}
@@ -267,11 +300,14 @@ export const Header: React.FC<HeaderProps> = ({
                 style={{
                   position: 'absolute',
                   right: 0,
-                  top: '44px',
-                  width: '320px',
-                  zIndex: 100,
-                  boxShadow: 'var(--shadow-md)',
-                  padding: '12px',
+                  top: '48px',
+                  width: '330px',
+                  zIndex: 120,
+                  boxShadow: 'var(--shadow-lg)',
+                  padding: '14px',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '12px',
+                  border: '1px solid #D6E4F8',
                 }}
               >
                 <div
@@ -279,65 +315,69 @@ export const Header: React.FC<HeaderProps> = ({
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    borderBottom: '1px solid #E2E8F0',
+                    borderBottom: '1px solid #E2EAF5',
                     paddingBottom: '8px',
-                    marginBottom: '8px',
+                    marginBottom: '10px',
                   }}
                 >
-                  <strong style={{ fontSize: '13px', color: '#2A3C5B' }}>
+                  <strong style={{ fontSize: '13px', color: '#1D2B42' }}>
                     Gazette & Regulatory Alerts
                   </strong>
-                  <span style={{ fontSize: '11px', color: '#3A74C2', fontWeight: 600 }}>
-                    2 New
+                  <span style={{ fontSize: '11px', color: '#3A74C2', fontWeight: 700 }}>
+                    2 Updates
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
                   <div
                     onClick={() => {
                       setShowNotifications(false);
-                      onNavigate('qco-regulations');
+                      onNavigate('/qco-regulations');
                     }}
                     style={{
-                      padding: '8px',
-                      backgroundColor: '#F8FAFC',
-                      borderRadius: '6px',
+                      padding: '10px',
+                      backgroundColor: '#F8FAFD',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       borderLeft: '3px solid #3A74C2',
                     }}
                   >
-                    <div style={{ fontWeight: 600, color: '#1E293B' }}>Potable Water Bottles QCO Enforced</div>
-                    <div style={{ color: '#64748B', fontSize: '11px' }}>Mandatory ISI Mark certification under IS 17526.</div>
+                    <div style={{ fontWeight: 700, color: '#1E293B' }}>Potable Water Bottles QCO Enforced</div>
+                    <div style={{ color: '#64748B', fontSize: '11.5px', marginTop: '2px' }}>
+                      Mandatory ISI Mark certification under IS 17526.
+                    </div>
                   </div>
                   <div
                     onClick={() => {
                       setShowNotifications(false);
-                      onNavigate('hallmarking-jewellery');
+                      onNavigate('/hallmarking/huid');
                     }}
                     style={{
-                      padding: '8px',
-                      backgroundColor: '#F8FAFC',
-                      borderRadius: '6px',
+                      padding: '10px',
+                      backgroundColor: '#F8FAFD',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       borderLeft: '3px solid #92BBF8',
                     }}
                   >
-                    <div style={{ fontWeight: 600, color: '#1E293B' }}>HUID 6-digit verification update</div>
-                    <div style={{ color: '#64748B', fontSize: '11px' }}>All 24K, 22K, 18K gold articles must carry HUID.</div>
+                    <div style={{ fontWeight: 700, color: '#1E293B' }}>6-Digit HUID Traceability Live</div>
+                    <div style={{ color: '#64748B', fontSize: '11.5px', marginTop: '2px' }}>
+                      Mandatory hallmarking active across all certified A&H centres.
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Help button */}
+          {/* Help Button */}
           <button
             onClick={() => setShowHelp(!showHelp)}
             title="Help Desk"
             style={{
-              width: '36px',
-              height: '36px',
+              width: '38px',
+              height: '38px',
               borderRadius: '50%',
-              backgroundColor: '#F7FAFD',
+              backgroundColor: '#F8FAFD',
               border: '1px solid #D6E4F8',
               color: '#39527B',
               display: 'flex',
@@ -345,120 +385,57 @@ export const Header: React.FC<HeaderProps> = ({
               justifyContent: 'center',
             }}
           >
-            <HelpCircle size={17} />
+            <HelpCircle size={18} />
           </button>
 
-          {/* User Profile Pill - inspired by the screenshot's user pill */}
-          <div style={{ position: 'relative' }}>
-            <div
-              onClick={() => setShowProfile(!showProfile)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '4px 12px 4px 6px',
-                backgroundColor: '#F1F6FD',
-                border: '1px solid #D6E4F8',
-                borderRadius: '20px',
-                cursor: 'pointer',
-              }}
-            >
-              <div
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  backgroundColor: '#39527B',
-                  color: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <User size={15} />
-              </div>
-              <div style={{ textAlign: 'left', lineHeight: 1.1 }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#2A3C5B' }}>
-                  pranjal shrivastava
-                </div>
-                <div style={{ fontSize: '10px', color: '#3A74C2', fontWeight: 600 }}>
-                  MSME • IND-48347
-                </div>
-              </div>
-            </div>
+          {/* Sign In Button (white background + blue border) */}
+          <button
+            onClick={() => setShowAuthModal('signin')}
+            style={{
+              backgroundColor: '#FFFFFF',
+              color: '#1D2B42',
+              border: '1.5px solid #3A74C2',
+              borderRadius: '20px',
+              padding: '7px 18px',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#F0F6FE';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
+            }}
+          >
+            Sign in
+          </button>
 
-            {showProfile && (
-              <div
-                className="card"
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '44px',
-                  width: '260px',
-                  zIndex: 100,
-                  boxShadow: 'var(--shadow-md)',
-                  padding: '14px',
-                }}
-              >
-                <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '10px', marginBottom: '10px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#2A3C5B' }}>
-                    Pranjal Shrivastava
-                  </div>
-                  <div style={{ fontSize: '11.5px', color: '#64748B' }}>pranjal.s@enterprise.gov.in</div>
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      backgroundColor: '#EAF7EE',
-                      color: '#166534',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      marginTop: '6px',
-                      display: 'inline-block',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Verified Industry Entity
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px' }}>
-                  <div
-                    onClick={() => {
-                      setShowProfile(false);
-                      onNavigate('verification-suite');
-                    }}
-                    style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', color: '#39527B' }}
-                  >
-                    My Licences & Applications
-                  </div>
-                  <div
-                    onClick={() => {
-                      setShowProfile(false);
-                      onNavigate('admin-dashboard');
-                    }}
-                    style={{ padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', color: '#39527B' }}
-                  >
-                    Admin Telemetry & Health
-                  </div>
-                  <a
-                    href="https://www.services.bis.gov.in"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      padding: '6px 8px',
-                      borderRadius: '4px',
-                      color: '#3A74C2',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Official BIS Manak Online <ExternalLink size={12} />
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Register Button (primary BIS blue) */}
+          <button
+            onClick={() => setShowAuthModal('register')}
+            style={{
+              backgroundColor: '#3A74C2',
+              color: '#FFFFFF',
+              border: '1.5px solid #3A74C2',
+              borderRadius: '20px',
+              padding: '7px 18px',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(58, 116, 194, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#2F62A8';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#3A74C2';
+            }}
+          >
+            Register
+          </button>
         </div>
       </header>
 
@@ -469,7 +446,7 @@ export const Header: React.FC<HeaderProps> = ({
             position: 'fixed',
             inset: 0,
             backgroundColor: 'rgba(29, 43, 66, 0.65)',
-            backdropFilter: 'blur(2px)',
+            backdropFilter: 'blur(3px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -482,7 +459,14 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <div
             className="card"
-            style={{ width: '100%', maxWidth: '520px', padding: '24px', backgroundColor: '#FFFFFF' }}
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              padding: '24px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '1px solid #D6E4F8',
+            }}
           >
             <div
               style={{
@@ -490,39 +474,68 @@ export const Header: React.FC<HeaderProps> = ({
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 marginBottom: '16px',
-                borderBottom: '1px solid #E2E8F0',
-                paddingBottom: '10px',
+                borderBottom: '1px solid #E2EAF5',
+                paddingBottom: '12px',
               }}
             >
-              <h3 style={{ fontSize: '16px', color: '#2A3C5B', fontWeight: 800 }}>
-                BIS Support & Regulatory Helpdesk
-              </h3>
-              <button onClick={() => setShowHelp(false)}>
-                <X size={18} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <BisLogo size={28} />
+                <h3 style={{ fontSize: '17px', color: '#1D2B42', fontWeight: 800 }}>
+                  BIS Institutional Helpdesk
+                </h3>
+              </div>
+              <button onClick={() => setShowHelp(false)} style={{ color: '#64748B' }}>
+                <X size={20} />
               </button>
             </div>
-            <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6 }}>
-              <p style={{ marginBottom: '12px' }}>
-                For authentic verification or filing complaints regarding misuse of ISI Mark or hallmarking, contact the official Bureau of Indian Standards channels:
+
+            <div style={{ fontSize: '13.5px', color: '#475569', lineHeight: 1.6 }}>
+              <p style={{ marginBottom: '14px' }}>
+                For statutory verification or filing complaints regarding misuse of ISI Mark or hallmarking, contact the official Bureau of Indian Standards channels:
               </p>
+
               <div
                 style={{
-                  backgroundColor: '#F8FAFC',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: '1px solid #E2EAF5',
-                  marginBottom: '14px',
+                  backgroundColor: '#F8FAFD',
+                  padding: '14px',
+                  borderRadius: '10px',
+                  border: '1px solid #D6E4F8',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
                 }}
               >
-                <div><strong>National Toll-Free Helpline:</strong> 1800-11-8004</div>
-                <div><strong>HQ Address:</strong> Manak Bhavan, 9 Bahadur Shah Zafar Marg, New Delhi - 110002</div>
-                <div><strong>e-Mail:</strong> info@bis.gov.in / complaints@bis.gov.in</div>
-                <div><strong>Official CARE Mobile App:</strong> BIS CARE (Google Play / App Store)</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Phone size={15} color="#3A74C2" />
+                  <span><strong>National Toll-Free Helpline:</strong> 1800-11-8004</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building2 size={15} color="#3A74C2" />
+                  <span><strong>HQ:</strong> Manak Bhavan, 9 Bahadur Shah Zafar Marg, New Delhi 110002</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Mail size={15} color="#3A74C2" />
+                  <span><strong>Complaints:</strong> complaints@bis.gov.in</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400E', backgroundColor: '#FFFBEB', padding: '10px', borderRadius: '6px', fontSize: '12px' }}>
-                <ShieldAlert size={16} />
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  color: '#92400E',
+                  backgroundColor: '#FFFBEB',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  border: '1px solid #FDE68A',
+                }}
+              >
+                <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <span>
-                  <strong>Hallucination Guard:</strong> This assistant provides source-backed citations from official BIS standards and QCOs. AI outputs must not be treated as formal statutory certification decisions.
+                  <strong>Official Hallucination Guard:</strong> The BIS Assistant references gazetted standards and QCOs. Always cross-check formal licence decisions with Manak Online.
                 </span>
               </div>
             </div>
@@ -530,8 +543,120 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
+      {/* Auth Modal (Sign In / Register) */}
+      {showAuthModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(29, 43, 66, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAuthModal(null);
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '440px',
+              padding: '28px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '1px solid #D6E4F8',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <BisLogo size={32} />
+                <h3 style={{ fontSize: '18px', color: '#1D2B42', fontWeight: 800 }}>
+                  {showAuthModal === 'signin' ? 'Sign In to BIS Portal' : 'Register for BIS Services'}
+                </h3>
+              </div>
+              <button onClick={() => setShowAuthModal(null)} style={{ color: '#64748B' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
+              Access certified standards, licence application tracking, and automated laboratory testing workflows via official e-BIS single sign-on.
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#1D2B42', display: 'block', marginBottom: '4px' }}>
+                  Email Address or Mobile Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="name@enterprise.gov.in"
+                  defaultValue="pranjal.s@enterprise.gov.in"
+                  style={{ width: '100%', height: '40px', padding: '0 12px', fontSize: '13px', borderRadius: '8px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#1D2B42', display: 'block', marginBottom: '4px' }}>
+                  Password or OTP
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••••••"
+                  defaultValue="password123"
+                  style={{ width: '100%', height: '40px', padding: '0 12px', fontSize: '13px', borderRadius: '8px' }}
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowAuthModal(null);
+                  onNavigate('/admin');
+                }}
+                className="btn btn-primary"
+                style={{ height: '42px', marginTop: '6px', borderRadius: '8px', fontSize: '14px', fontWeight: 700 }}
+              >
+                {showAuthModal === 'signin' ? 'Continue with e-BIS SSO' : 'Create Industry Account'}
+              </button>
+            </div>
+
+            <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#64748B' }}>
+              {showAuthModal === 'signin' ? (
+                <span>
+                  Don't have a verified account?{' '}
+                  <span
+                    onClick={() => setShowAuthModal('register')}
+                    style={{ color: '#3A74C2', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Register here
+                  </span>
+                </span>
+              ) : (
+                <span>
+                  Already registered?{' '}
+                  <span
+                    onClick={() => setShowAuthModal('signin')}
+                    style={{ color: '#3A74C2', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Sign in
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
-        @media (max-width: 860px) {
+        @media (max-width: 900px) {
+          .header-center-container {
+            display: none !important;
+          }
           .mobile-menu-toggle {
             display: inline-flex !important;
           }

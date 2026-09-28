@@ -1,4 +1,4 @@
-import React from 'react';
+import { BisLogo } from '../common/BisLogo';
 import {
   LayoutDashboard,
   BotMessageSquare,
@@ -305,12 +305,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '20px',
               flexShrink: 0,
               boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+              overflow: 'hidden',
             }}
           >
-            🇮🇳
+            <BisLogo size={24} />
           </div>
           <div>
             <div
@@ -402,19 +402,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </aside>
 
       <style>{`
-        @media (max-width: 1024px) {
-          .app-sidebar {
-            position: fixed !important;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            transform: translateX(-100%);
-            transition: transform 0.25s ease-in-out;
-            box-shadow: 0 0 25px rgba(0, 0, 0, 0.35);
-          }
-          .app-sidebar.open {
-            transform: translateX(0);
-          }
+        .app-sidebar {
+          position: fixed !important;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          width: var(--sidebar-width);
+          transform: translateX(-100%);
+          transition: transform 0.25s ease-in-out;
+          box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+          z-index: 1000 !important;
+        }
+        .app-sidebar.open {
+          transform: translateX(0);
         }
       `}</style>
     </>

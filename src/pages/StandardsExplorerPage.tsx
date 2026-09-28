@@ -5,6 +5,12 @@ import {
   SlidersHorizontal,
   ExternalLink,
   Award,
+  ChevronLeft,
+  FileText,
+  Layers,
+  ArrowRight,
+  Filter,
+  CheckCircle2,
 } from 'lucide-react';
 import { IndianStandard, NavRoute } from '../types';
 import { standardsService } from '../services/standardsService';
@@ -15,13 +21,19 @@ import { ErrorState } from '../components/common/ErrorState';
 
 interface StandardsExplorerPageProps {
   initialSearch?: string;
+  subRoute?: string;
   onNavigate: (route: NavRoute, payload?: any) => void;
 }
 
 export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
   initialSearch = '',
+  subRoute = 'search',
   onNavigate,
 }) => {
+  const [activeTab, setActiveTab] = useState<'search' | 'detail' | 'clauses' | 'related'>(
+    subRoute === 'clauses' ? 'clauses' : subRoute === 'detail' ? 'detail' : 'search'
+  );
+
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedDepartment, setSelectedDepartment] = useState('ALL');
   const [onlyQcoMandatory, setOnlyQcoMandatory] = useState(false);
@@ -52,6 +64,9 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
         qcoOnly: onlyQcoMandatory,
       });
       setStandards(data);
+      if (data.length > 0 && !selectedStandard) {
+        setSelectedStandard(data[0]);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load standards');
     } finally {
@@ -76,322 +91,512 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
     : [];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Search Header */}
+    <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Breadcrumb Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B' }}>
+        <button
+          onClick={() => onNavigate('/')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: '#3A74C2',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronLeft size={16} /> Home
+        </button>
+        <span>/</span>
+        <button
+          onClick={() => onNavigate('/government-services')}
+          style={{ color: '#3A74C2', fontWeight: 600, cursor: 'pointer' }}
+        >
+          Government Services
+        </button>
+        <span>/</span>
+        <span style={{ color: '#1D2B42', fontWeight: 700 }}>Standards Explorer</span>
+      </div>
+
+      {/* Header Container */}
       <div
         className="card"
         style={{
           padding: '24px 28px',
-          background: '#FFFFFF',
+          background: 'linear-gradient(180deg, #F0F6FE 0%, #FFFFFF 100%)',
           border: '1px solid #D6E4F8',
+          borderRadius: '16px',
         }}
       >
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <BookOpen size={20} color="#3A74C2" />
-            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#2A3C5B' }}>
-              Indian Standards Explorer (IS Catalogue)
-            </h1>
-          </div>
-          <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-            Browse gazetted Indian Standards. Powered by <code>GET /api/standards</code>.
-          </p>
-        </div>
-
-        {/* Big Search Bar */}
-        <div style={{ position: 'relative', width: '100%', marginBottom: '16px' }}>
-          <Search
-            size={18}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+          <div
             style={{
-              position: 'absolute',
-              left: '14px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#3A74C2',
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Search by IS number (e.g., IS 17526), title, product, or keyword..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              height: '46px',
-              paddingLeft: '44px',
-              paddingRight: '16px',
-              fontSize: '14px',
-              backgroundColor: '#F8FAFD',
-              border: '1px solid #D6E4F8',
-              borderRadius: '8px',
-            }}
-          />
-        </div>
-
-        {/* Filters */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 700,
-                color: '#39527B',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <SlidersHorizontal size={14} /> Committee:
-            </span>
-            <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              style={{
-                padding: '6px 12px',
-                fontSize: '12.5px',
-                border: '1px solid #D6E4F8',
-                borderRadius: '6px',
-                backgroundColor: '#FFFFFF',
-                color: '#2A3C5B',
-              }}
-            >
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept === 'ALL' ? 'All Technical Committees' : dept}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <label
-            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              backgroundColor: '#EAF2FE',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              color: '#2A3C5B',
-              cursor: 'pointer',
-              backgroundColor: onlyQcoMandatory ? '#FEF2F2' : '#F8FAFC',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: onlyQcoMandatory ? '1px solid #FECACA' : '1px solid #D6E4F8',
+              justifyContent: 'center',
+              color: '#3A74C2',
             }}
           >
-            <input
-              type="checkbox"
-              checked={onlyQcoMandatory}
-              onChange={(e) => setOnlyQcoMandatory(e.target.checked)}
-            />
-            <span>Show Only Mandatory QCO Standards</span>
-          </label>
+            <BookOpen size={22} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#1D2B42' }}>
+              Standards Explorer
+            </h1>
+            <p style={{ fontSize: '13.5px', color: '#64748B' }}>
+              Search Indian Standards, explore technical requirements and retrieve clause-level information.
+            </p>
+          </div>
+        </div>
+
+        {/* Sub-Feature Navigation Cards / Tabs */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '12px',
+            marginTop: '20px',
+            borderTop: '1px solid #E2EAF5',
+            paddingTop: '16px',
+          }}
+        >
+          {[
+            {
+              id: 'search',
+              title: '1. Standard Search',
+              desc: 'By IS number, title, keyword or department',
+            },
+            {
+              id: 'detail',
+              title: '2. Standard Detail',
+              desc: 'Scope, year, amendments & certification',
+            },
+            {
+              id: 'clauses',
+              title: '3. Clause Retrieval',
+              desc: 'Specific clauses, text & page numbers',
+            },
+            {
+              id: 'related',
+              title: '4. Related Standards',
+              desc: 'Superseded versions & test methods',
+            },
+          ].map((sub) => {
+            const isActive = activeTab === sub.id;
+            return (
+              <div
+                key={sub.id}
+                onClick={() => setActiveTab(sub.id as any)}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  backgroundColor: isActive ? '#EAF2FE' : '#FFFFFF',
+                  border: isActive ? '1.5px solid #3A74C2' : '1px solid #D6E4F8',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: 700, color: isActive ? '#1D2B42' : '#39527B' }}>
+                  {sub.title}
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                  {sub.desc}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Content Area */}
-      {isLoading ? (
-        <LoadingSkeleton type="card" count={2} message="Loading Indian Standards from GET /api/standards..." />
-      ) : error ? (
-        <ErrorState message={error} onRetry={fetchStandards} apiEndpoint="GET /api/standards" />
-      ) : standards.length === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title="No standards found"
-          description="Search for an Indian Standard, product, or keyword to explore applicable specifications."
-          actionText="Clear Search Filters"
-          onAction={() => {
-            setSearchQuery('');
-            setSelectedDepartment('ALL');
-            setOnlyQcoMandatory(false);
-          }}
-        />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ fontSize: '13px', color: '#64748B' }}>
-            Found <strong>{standards.length}</strong> Indian Standards from API service
-          </div>
-
-          {standards.map((std) => (
-            <div
-              key={std.id}
-              className="card"
-              style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #D6E4F8',
-                padding: '20px 24px',
-                borderRadius: '10px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  marginBottom: '10px',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-heading)',
-                        fontSize: '17px',
-                        fontWeight: 800,
-                        color: '#3A74C2',
-                      }}
-                    >
-                      {std.isNumber}
-                    </span>
-                    <span className="badge badge-verified" style={{ fontSize: '11px' }}>
-                      {std.status}
-                    </span>
-                    {std.qcoMandatory && (
-                      <span className="badge badge-danger" style={{ fontSize: '11px' }}>
-                        Mandatory QCO
-                      </span>
-                    )}
-                    <span className="badge badge-sky" style={{ fontSize: '11px' }}>
-                      {std.certificationScheme}
-                    </span>
-                  </div>
-                  <h3 style={{ fontSize: '15.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '4px' }}>
-                    {std.title}
-                  </h3>
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    {std.department} • Category: <strong>{std.category}</strong>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => {
-                      setSelectedStandard(std);
-                      setClauseSearchQuery('');
-                    }}
-                    className="btn btn-primary btn-sm"
-                  >
-                    <BookOpen size={14} /> View Standard Details
-                  </button>
-                  <button
-                    onClick={() => onNavigate('certification', std.id)}
-                    className="btn btn-secondary btn-sm"
-                  >
-                    <Award size={14} /> Certification Roadmap
-                  </button>
-                </div>
-              </div>
-
-              <p
-                style={{
-                  fontSize: '13px',
-                  color: '#475569',
-                  lineHeight: 1.5,
-                  backgroundColor: '#F8FAFD',
-                  padding: '10px 14px',
-                  borderRadius: '6px',
-                  border: '1px solid #E2EAF5',
-                  marginBottom: '12px',
-                }}
-              >
-                <strong>Scope:</strong> {std.scope}
-              </p>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '12px',
-                  color: '#64748B',
-                  borderTop: '1px solid #EDF3FB',
-                  paddingTop: '10px',
-                }}
-              >
-                <div>Clauses Indexed: <strong>{std.clauses.length}</strong></div>
-                <a
-                  href={std.bisSourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: '#3A74C2', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  Official BIS Portal <ExternalLink size={12} />
-                </a>
+      {/* Main Content Area based on Sub-Feature */}
+      {activeTab === 'search' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Search Controls */}
+          <div
+            className="card"
+            style={{
+              padding: '16px 20px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #D6E4F8',
+              borderRadius: '12px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '12px',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '280px' }}>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#3A74C2' }} />
+                <input
+                  type="text"
+                  placeholder="Search by IS Number (e.g. IS 17526, IS 9873), title, product..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    paddingLeft: '38px',
+                    paddingRight: '12px',
+                    fontSize: '13.5px',
+                    borderRadius: '8px',
+                    border: '1px solid #C4DCFA',
+                    backgroundColor: '#F8FAFD',
+                  }}
+                />
               </div>
             </div>
-          ))}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                style={{
+                  height: '40px',
+                  padding: '0 12px',
+                  fontSize: '13px',
+                  borderRadius: '8px',
+                  border: '1px solid #D6E4F8',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1E293B',
+                }}
+              >
+                {departments.map((d) => (
+                  <option key={d} value={d}>
+                    {d === 'ALL' ? 'All Technical Departments' : d}
+                  </option>
+                ))}
+              </select>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12.5px',
+                  color: '#1D2B42',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  backgroundColor: '#F8FAFD',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #D6E4F8',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={onlyQcoMandatory}
+                  onChange={(e) => setOnlyQcoMandatory(e.target.checked)}
+                />
+                <span>Mandatory QCO Only</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Standards Results List */}
+          {isLoading ? (
+            <LoadingSkeleton type="card" count={3} />
+          ) : error ? (
+            <ErrorState title="Standards Unavailable" message={error} onRetry={fetchStandards} />
+          ) : standards.length === 0 ? (
+            <EmptyState
+              title="No Indian Standards Found"
+              description={`No records matched "${searchQuery}". Try searching by standard number or broader product keyword.`}
+            />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+              {standards.map((s) => (
+                <div
+                  key={s.id}
+                  className="card bis-feature-card"
+                  style={{
+                    padding: '20px',
+                    borderRadius: '14px',
+                    border: '1px solid #D6E4F8',
+                    backgroundColor: '#FFFFFF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 800,
+                          color: '#3A74C2',
+                          backgroundColor: '#EAF2FE',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid #BFDBFE',
+                        }}
+                      >
+                        {s.isNumber}
+                      </span>
+                      {s.qcoMandatory && (
+                        <span className="badge badge-danger">Mandatory QCO</span>
+                      )}
+                    </div>
+
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#1D2B42', marginBottom: '8px', lineHeight: 1.4 }}>
+                      {s.title}
+                    </h3>
+
+                    <p style={{ fontSize: '12.5px', color: '#64748B', lineHeight: 1.5, marginBottom: '12px' }}>
+                      {s.scope.length > 140 ? `${s.scope.slice(0, 140)}...` : s.scope}
+                    </p>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#64748B' }}>
+                      Scheme: {s.certificationScheme}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setSelectedStandard(s);
+                        setActiveTab('detail');
+                      }}
+                      className="btn btn-sm btn-primary"
+                      style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px' }}
+                    >
+                      View Details &rarr;
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Standard Detail Modal */}
-      {selectedStandard && (
-        <Modal
-          isOpen={!!selectedStandard}
-          onClose={() => setSelectedStandard(null)}
-          title={`${selectedStandard.isNumber} : ${selectedStandard.year}`}
-          subtitle={selectedStandard.title}
-          maxWidth="840px"
+      {/* Sub-Feature 2: Standard Detail */}
+      {activeTab === 'detail' && selectedStandard && (
+        <div
+          className="card"
+          style={{
+            padding: '28px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #D6E4F8',
+            borderRadius: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+          }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span className="badge badge-verified">{selectedStandard.status}</span>
-              {selectedStandard.qcoMandatory && (
-                <span className="badge badge-danger">QCO Mandatory Scheme</span>
-              )}
-              <span className="badge badge-sky">{selectedStandard.certificationScheme}</span>
-            </div>
-
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h4 style={{ fontSize: '13.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
-                Standard Scope
-              </h4>
-              <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6, backgroundColor: '#F8FAFD', padding: '12px', borderRadius: '6px', border: '1px solid #E2EAF5' }}>
-                {selectedStandard.scope}
-              </p>
-            </div>
-
-            {/* Clause Explorer */}
-            <div style={{ border: '1px solid #D6E4F8', borderRadius: '8px', padding: '16px' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#2A3C5B', marginBottom: '8px' }}>
-                Indexed Clauses
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {filteredClauses.map((clause, idx) => (
-                  <div key={idx} style={{ padding: '8px 12px', backgroundColor: '#F8FAFC', borderRadius: '6px' }}>
-                    <div style={{ fontWeight: 700, color: '#3A74C2', fontSize: '13px' }}>
-                      {clause.clauseNumber} — {clause.title} ({clause.page})
-                    </div>
-                    <p style={{ fontSize: '12.5px', color: '#334155', marginTop: '2px' }}>
-                      {clause.text}
-                    </p>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '18px', fontWeight: 800, color: '#3A74C2' }}>
+                  {selectedStandard.isNumber}
+                </span>
+                <span className="badge badge-sky">{selectedStandard.year}</span>
+                <span className="badge badge-verified">Status: {selectedStandard.status}</span>
+                {selectedStandard.qcoMandatory && <span className="badge badge-danger">Mandatory QCO</span>}
+              </div>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#1D2B42' }}>
+                {selectedStandard.title}
+              </h2>
+              <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '4px' }}>
+                Technical Committee: {selectedStandard.department} • Last Updated: {selectedStandard.lastUpdated}
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #E2EAF5', paddingTop: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
-                onClick={() => {
-                  const id = selectedStandard.id;
-                  setSelectedStandard(null);
-                  onNavigate('certification', id);
-                }}
-                className="btn btn-primary btn-sm"
+                onClick={() => setActiveTab('clauses')}
+                className="btn btn-secondary btn-sm"
               >
-                Certification Guidance &rarr;
+                Inspect Clauses ({selectedStandard.clauses.length})
               </button>
+              <a
+                href={selectedStandard.bisSourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary btn-sm"
+                style={{ gap: '4px' }}
+              >
+                Official BIS Document <ExternalLink size={13} />
+              </a>
             </div>
           </div>
-        </Modal>
+
+          <div style={{ backgroundColor: '#F8FAFD', padding: '16px', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#1D2B42', marginBottom: '6px' }}>
+              Scope of the Standard
+            </h4>
+            <p style={{ fontSize: '13.5px', color: '#334155', lineHeight: 1.6 }}>
+              {selectedStandard.scope}
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+            <div style={{ border: '1px solid #E2EAF5', borderRadius: '10px', padding: '16px' }}>
+              <strong style={{ fontSize: '13px', color: '#1D2B42', display: 'block', marginBottom: '8px' }}>
+                Certification Scheme & Route
+              </strong>
+              <div style={{ fontSize: '13px', color: '#475569' }}>
+                <strong>Applicable Scheme:</strong> {selectedStandard.certificationScheme}
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+                Requires factory conformity audit & testing per Scheme of Testing and Inspection (STI).
+              </div>
+              <button
+                onClick={() => onNavigate('/certification', selectedStandard.id)}
+                style={{ marginTop: '10px', color: '#3A74C2', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                View Certification Roadmap &rarr;
+              </button>
+            </div>
+
+            <div style={{ border: '1px solid #E2EAF5', borderRadius: '10px', padding: '16px' }}>
+              <strong style={{ fontSize: '13px', color: '#1D2B42', display: 'block', marginBottom: '8px' }}>
+                Amendments & Gazette Revisions
+              </strong>
+              {selectedStandard.amendments.length > 0 ? (
+                <ul style={{ paddingLeft: '18px', fontSize: '12.5px', color: '#475569' }}>
+                  {selectedStandard.amendments.map((am, i) => (
+                    <li key={i}>{am}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span style={{ fontSize: '12px', color: '#64748B' }}>No active amendments published.</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Feature 3: Clause-Level Retrieval */}
+      {activeTab === 'clauses' && selectedStandard && (
+        <div
+          className="card"
+          style={{
+            padding: '24px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #D6E4F8',
+            borderRadius: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42' }}>
+                Clause-Level Retrieval: {selectedStandard.isNumber}
+              </h2>
+              <p style={{ fontSize: '12.5px', color: '#64748B' }}>
+                Directly retrieve specific requirements, test thresholds, and sampling provisions.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab('detail')}
+              style={{ fontSize: '12px', color: '#3A74C2', fontWeight: 600, cursor: 'pointer' }}
+            >
+              &larr; Back to Detail
+            </button>
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#3A74C2' }} />
+            <input
+              type="text"
+              placeholder="Search clause by title, number (e.g. 4.1), or requirement text..."
+              value={clauseSearchQuery}
+              onChange={(e) => setClauseSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                height: '40px',
+                paddingLeft: '38px',
+                paddingRight: '12px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                border: '1px solid #C4DCFA',
+                backgroundColor: '#F8FAFD',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {filteredClauses.map((c, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '14px 16px',
+                  backgroundColor: '#F8FAFD',
+                  borderRadius: '10px',
+                  border: '1px solid #E2EAF5',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#3A74C2' }}>
+                    Clause {c.clauseNumber}: {c.title}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#64748B', backgroundColor: '#FFFFFF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #E2EAF5' }}>
+                    Page {c.page}
+                  </span>
+                </div>
+                <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.5 }}>
+                  {c.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Feature 4: Related Standards */}
+      {activeTab === 'related' && selectedStandard && (
+        <div
+          className="card"
+          style={{
+            padding: '24px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #D6E4F8',
+            borderRadius: '16px',
+          }}
+        >
+          <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+            Related & Referenced Standards for {selectedStandard.isNumber}
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
+            Standards cross-referenced for material testing, food contact compliance, and quality control.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+            {selectedStandard.relatedStandards.map((rel, idx) => (
+              <div
+                key={idx}
+                style={{
+                  padding: '12px 14px',
+                  backgroundColor: '#F8FAFD',
+                  border: '1px solid #D6E4F8',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#1D2B42' }}>{rel}</span>
+                <button
+                  onClick={() => {
+                    setSearchQuery(rel);
+                    setActiveTab('search');
+                  }}
+                  style={{ color: '#3A74C2', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Inspect &rarr;
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
