@@ -97,32 +97,32 @@ export interface IndianStandard {
   id: string;
   isNumber: string;
   title: string;
-  year: string;
-  department: string;
-  category: string;
+  year?: string;
+  department?: string;
+  category?: string;
   status: 'ACTIVE' | 'UNDER_REVISION' | 'WITHDRAWN';
-  qcoMandatory: boolean;
+  qcoMandatory?: boolean;
   qcoDate?: string;
-  scope: string;
+  scope?: string;
   description?: string;
   applicableProducts?: string[];
-  clauses: ClauseInfo[];
-  amendments: string[];
-  certificationScheme: 'Scheme I (ISI Mark)' | 'Scheme II (CRS)' | 'Scheme IV' | 'Voluntary';
-  relatedStandards: string[];
-  bisSourceUrl: string;
-  lastUpdated: string;
+  clauses?: ClauseInfo[];
+  amendments?: string[];
+  certificationScheme?: string;
+  relatedStandards?: string[];
+  bisSourceUrl?: string;
+  lastUpdated?: string;
   qcoInfo?: {
-    mandatory: boolean;
-    orderTitle: string;
-    ministry: string;
-    effectiveDate: string;
-    notificationNo: string;
+    mandatory?: boolean;
+    orderTitle?: string;
+    ministry?: string;
+    effectiveDate?: string;
+    notificationNo?: string;
   };
   certificationInfo?: {
-    scheme: string;
-    mark: string;
-    procedure: string;
+    scheme?: string;
+    mark?: string;
+    procedure?: string;
   };
   sourceReference?: string;
 }
@@ -138,18 +138,18 @@ export interface TestingLab {
   name: string;
   code: string;
   state: string;
-  district: string;
+  district?: string;
   city: string;
-  address: string;
-  contact: string;
-  email: string;
-  capabilities: string[];
-  accreditedStandards: string[];
+  address?: string;
+  contact?: string;
+  email?: string;
+  capabilities?: string[];
+  accreditedStandards?: string[];
   services?: string[];
-  validity: string;
+  validity?: string;
   status: 'RECOGNIZED' | 'AUDIT_PENDING' | 'SUSPENDED';
-  officialSource: string;
-  lastVerified: string;
+  officialSource?: string;
+  lastVerified?: string;
   distanceKm?: number;
 }
 
@@ -159,28 +159,30 @@ export interface HallmarkingCentre {
   code: string;
   state: string;
   city: string;
-  address: string;
+  district?: string;
+  address?: string;
   contact?: string;
   services?: string[];
-  metalCapability: 'Gold (Au)' | 'Silver (Ag)' | 'Gold & Silver';
+  metalCapability?: string;
   status: 'OPERATIONAL' | 'RECOGNITION_EXPIRED' | 'AUDIT_IN_PROGRESS';
-  validity: string;
-  officialSource: string;
-  lastVerified: string;
+  validity?: string;
+  officialSource?: string;
+  lastVerified?: string;
 }
 
 export interface LicensedJeweller {
   id: string;
   licenceNo: string;
   jewellerName: string;
-  address: string;
+  address?: string;
   city: string;
   state: string;
+  district?: string;
   contact?: string;
-  metalCategory: 'Gold' | 'Silver' | 'Both';
+  metalCategory?: string;
   status: 'OPERATIVE' | 'SURRENDERED' | 'CANCELLED';
-  validTill: string;
-  lastSynchronized: string;
+  validTill?: string;
+  lastSynchronized?: string;
 }
 
 export interface QcoRecord {
@@ -189,21 +191,21 @@ export interface QcoRecord {
   product: string;
   isNumber: string;
   ministry: string;
-  notificationNo: string;
-  notificationDate: string;
-  effectiveDate: string;
+  notificationNo?: string;
+  notificationDate?: string;
+  effectiveDate?: string;
   status: 'ENFORCED' | 'UPCOMING' | 'EXTENDED';
   applicableProducts?: string[];
   applicableStandards?: string[];
   complianceRequirements?: string[];
   importantDates?: {
-    notification: string;
-    enforcement: string;
+    notification?: string;
+    enforcement?: string;
     extension?: string;
   };
-  sourceGazette: string;
+  sourceGazette?: string;
   sourceReference?: string;
-  lastSynchronized: string;
+  lastSynchronized?: string;
 }
 
 export interface CertificationScheme {
@@ -212,11 +214,11 @@ export interface CertificationScheme {
   code: string;
   badge: string;
   description: string;
-  applicableProducts: string[];
-  eligibility: string;
-  basicProcedure: string[];
-  requiredDocuments: string[];
-  importantSteps: string[];
+  applicableProducts?: string[];
+  eligibility?: string;
+  basicProcedure?: string[];
+  requiredDocuments?: string[];
+  importantSteps?: string[];
 }
 
 export interface ProductCertificationMapping {
@@ -226,8 +228,8 @@ export interface ProductCertificationMapping {
   applicableScheme: string;
   applicableStandard: string;
   standardTitle: string;
-  requiredDocuments: string[];
-  basicProcess: string[];
+  requiredDocuments?: string[];
+  basicProcess?: string[];
 }
 
 export interface HuidVerificationResult {
@@ -246,9 +248,9 @@ export interface HuidVerificationResult {
   hallmarkingDate?: string;
   articleType?: string;
   articleWeight?: string;
-  officialSource: string;
-  verifiedAt: string;
-  disclaimer: string;
+  officialSource?: string;
+  verifiedAt?: string;
+  disclaimer?: string;
 }
 
 export interface LicenceVerificationResult {
@@ -262,8 +264,8 @@ export interface LicenceVerificationResult {
   validTill?: string;
   scheme?: string;
   certificationDetails?: string;
-  officialSource: string;
-  verifiedAt: string;
+  officialSource?: string;
+  verifiedAt?: string;
 }
 
 export interface CrsVerificationResult {
@@ -275,8 +277,8 @@ export interface CrsVerificationResult {
   isStandard?: string;
   validTill?: string;
   registrationDetails?: string;
-  officialSource: string;
-  verifiedAt: string;
+  officialSource?: string;
+  verifiedAt?: string;
 }
 
 export interface ChatMessage {
@@ -329,12 +331,12 @@ export interface AdminSyncRecord {
   id: string;
   sourceName: string;
   dataType: string;
-  recordsAdded: number;
-  recordsUpdated: number;
-  recordsRemoved: number;
+  recordsAdded?: number;
+  recordsUpdated?: number;
+  recordsRemoved?: number;
   status: 'SUCCESS' | 'WARNING' | 'FAILED';
   lastRun: string;
-  durationMs: number;
+  durationMs?: number;
   completedAt?: string;
   recordsProcessed?: number;
   errorsCount?: number;
@@ -350,12 +352,12 @@ export interface SyncErrorRecord {
 
 export interface SourceHealthMetric {
   name: string;
-  endpoint: string;
+  endpoint?: string;
   status: 'HEALTHY' | 'WARNING' | 'ERROR' | 'STALE';
-  uptimePercentage: number;
-  latencyMs: number;
+  uptimePercentage?: number;
+  latencyMs?: number;
   lastChecked: string;
-  lastSuccessSync: string;
+  lastSuccessSync?: string;
   records?: number;
 }
 

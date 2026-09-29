@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { NavRoute, HallmarkingCentre } from '../types';
 import { hallmarkingService } from '../services/hallmarkingService';
+import { jewelleryApi } from '../api/jewellery';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 import { SegmentedControl } from '../components/common/SegmentedControl';
 
 interface HallmarkingJewelleryPageProps {
@@ -40,7 +42,7 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
   const [activeTab, setActiveTab] = useState<'centres' | 'scanner' | 'purity'>(mapInitialTab());
 
   // ==========================================
-  // 1. Hallmarking Centre Finder State
+  // 1. Hallmarking Centre Finder State (Backend-Powered)
   // ==========================================
   const [ahcSearchQuery, setAhcSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
@@ -48,19 +50,31 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [ahcs, setAhcs] = useState<HallmarkingCentre[]>([]);
   const [isLoadingAhcs, setIsLoadingAhcs] = useState(true);
+  const [ahcError, setAhcError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   const states = ['ALL', 'Delhi', 'Maharashtra', 'Karnataka', 'Tamil Nadu', 'Telangana', 'Rajasthan', 'West Bengal', 'Gujarat'];
 
   const fetchAhcs = async () => {
     setIsLoadingAhcs(true);
+    setAhcError(null);
     try {
-      const data = await hallmarkingService.getAhcCentres({
+      const res = await hallmarkingService.getPaginatedAhcCentres({
         query: ahcSearchQuery,
-        state: selectedState,
-        city: selectedCity,
-        status: selectedStatus,
+        state: selectedState !== 'ALL' ? selectedState : undefined,
+        city: selectedCity.trim() || undefined,
+        status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+        page: currentPage,
+        pageSize: 20,
       });
-      setAhcs(data);
+      setAhcs(res.items);
+      setTotalPages(res.totalPages);
+      setTotalItems(res.totalItems);
+    } catch (err: any) {
+      setAhcError(err?.message || 'Unable to connect to BIS Parakh hallmarking service.');
+      setAhcs([]);
     } finally {
       setIsLoadingAhcs(false);
     }
@@ -68,13 +82,14 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
 
   useEffect(() => {
     fetchAhcs();
-  }, [ahcSearchQuery, selectedState, selectedCity, selectedStatus]);
+  }, [ahcSearchQuery, selectedState, selectedCity, selectedStatus, currentPage]);
 
   // ==========================================
-  // 2. Hallmark Scanner State (Local Analysis)
+  // 2. Hallmark Scanner State (Backend Vision /jewellery/scan)
   // ==========================================
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerResult, setScannerResult] = useState<{
     detectedHallmark: boolean;
     huid: string;
@@ -87,27 +102,51 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSimulateScan = (imagePlaceholder?: string) => {
+  const handleScanFile = async (file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+    setUploadedImage(previewUrl);
     setIsScanning(true);
-    setUploadedImage(imagePlaceholder || 'sample_hallmarked_ring.jpg');
-    setTimeout(() => {
-      setIsScanning(false);
+    setScannerError(null);
+    setScannerResult(null);
+
+    try {
+      const res = await jewelleryApi.scanJewelleryMarks(file);
+      const detectedMarks: string[] = [];
+      if (res.detected_bis_logo) detectedMarks.push('BIS Standard Triangular Mark (Compliant)');
+      if (res.detected_fineness) detectedMarks.push(`Purity / Karatage Mark: ${res.detected_fineness} (IS 1417)`);
+      if (res.detected_huid) detectedMarks.push(`6-Character Alphanumeric Laser HUID: ${res.detected_huid}`);
+
+      const hasMarks = res.detected_bis_logo || Boolean(res.detected_huid) || Boolean(res.detected_fineness);
+      const finenessStr = res.detected_fineness || null;
+
+      let purityPercentStr = 'Not available';
+      let metalStr = 'Not available';
+      if (finenessStr) {
+        metalStr = finenessStr.toLowerCase().includes('silver') ? 'Silver (Ag)' : 'Gold (Au)';
+        if (finenessStr.includes('750')) purityPercentStr = '75.0%';
+        else if (finenessStr.includes('925')) purityPercentStr = '92.5%';
+        else if (finenessStr.includes('916')) purityPercentStr = '91.6%';
+        else if (finenessStr.includes('585')) purityPercentStr = '58.5%';
+        else purityPercentStr = finenessStr;
+      }
+
       setScannerResult({
-        detectedHallmark: true,
-        huid: 'AB1234',
-        metal: 'Gold (Au)',
-        purity: '22 Karat (916 fineness)',
-        purityPercent: '91.6%',
-        confidence: 96.4,
-        detectedMarks: [
-          'BIS Triangular Standard Logo (Compliant)',
-          'Purity Mark: 22K916 (IS 1417 Compliant)',
-          '6-Character Alphanumeric Laser HUID: AB1234',
-        ],
-        explanation:
-          'High-contrast optical analysis detected all three mandatory statutory hallmarking marks on the inner shank. The 6-character HUID "AB1234" was recognized with 96.4% confidence and correlates with an active BIS registered consignment.',
+        detectedHallmark: hasMarks,
+        huid: res.detected_huid || 'Not identified in image',
+        metal: metalStr,
+        purity: finenessStr || 'Fineness not detected',
+        purityPercent: purityPercentStr,
+        confidence: Math.round(res.confidence_score * 100),
+        detectedMarks: detectedMarks.length > 0 ? detectedMarks : ['Optical edge detection scan complete'],
+        explanation: res.detected_huid
+          ? `Neural vision model successfully identified laser hallmark engraving with HUID "${res.detected_huid}".`
+          : 'Neural vision model evaluated the hallmark engravings against BIS statutory hallmarks criteria.',
       });
-    }, 450);
+    } catch (err: any) {
+      setScannerError(err?.message || 'Vision model processing failed. Please check image quality and try again.');
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   // ==========================================
@@ -359,7 +398,14 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
           </div>
 
           {/* Cards Grid */}
-          {isLoadingAhcs ? (
+          {ahcError ? (
+            <ErrorState
+              title="Unable to Load Hallmarking Centres"
+              message={ahcError}
+              apiEndpoint="/api/v1/hallmarking/centres"
+              onRetry={fetchAhcs}
+            />
+          ) : isLoadingAhcs ? (
             <LoadingSkeleton type="card" count={3} message="Loading Assaying & Hallmarking Centres..." />
           ) : ahcs.length === 0 ? (
             <EmptyState
@@ -372,96 +418,139 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
                 setSelectedState('ALL');
                 setSelectedCity('');
                 setSelectedStatus('ALL');
+                setCurrentPage(1);
               }}
             />
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
-              {ahcs.map((ahc) => (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+                {ahcs.map((ahc) => (
+                  <div
+                    key={ahc.id}
+                    className="card"
+                    style={{
+                      padding: '22px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #D6E4F8',
+                      borderRadius: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '14px',
+                      boxShadow: '0 2px 6px rgba(30, 41, 59, 0.04)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                        <span className="badge badge-sky">{ahc.code}</span>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            backgroundColor: ahc.status === 'OPERATIONAL' ? '#DCFCE7' : '#FEF3C7',
+                            color: ahc.status === 'OPERATIONAL' ? '#166534' : '#92400E',
+                          }}
+                        >
+                          {ahc.status}
+                        </span>
+                      </div>
+
+                      <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
+                        {ahc.name}
+                      </h3>
+
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12.5px', color: '#475569', marginBottom: '8px' }}>
+                        <MapPin size={15} style={{ color: '#3A74C2', flexShrink: 0, marginTop: '2px' }} />
+                        <span>{ahc.address}</span>
+                      </div>
+
+                      <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>
+                        City: <strong>{ahc.city}</strong> • State: <strong>{ahc.state}</strong>
+                      </div>
+
+                      {ahc.contact && (
+                        <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '10px' }}>
+                          Contact: {ahc.contact}
+                        </div>
+                      )}
+
+                      {ahc.services && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {ahc.services.map((srv, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: '#F1F6FD',
+                                color: '#39527B',
+                                fontWeight: 500,
+                              }}
+                            >
+                              • {srv}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#64748B' }}>
+                      <span>Capability: <strong>{ahc.metalCapability || 'Not available'}</strong></span>
+                      <span>Valid: {ahc.validity || 'Active'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
                 <div
-                  key={ahc.id}
-                  className="card"
                   style={{
-                    padding: '22px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D6E4F8',
-                    borderRadius: '16px',
                     display: 'flex',
-                    flexDirection: 'column',
                     justifyContent: 'space-between',
-                    gap: '14px',
-                    boxShadow: '0 2px 6px rgba(30, 41, 59, 0.04)',
+                    alignItems: 'center',
+                    marginTop: '8px',
+                    padding: '12px 18px',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '12px',
+                    border: '1px solid #D6E4F8',
+                    flexWrap: 'wrap',
+                    gap: '12px',
                   }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-                      <span className="badge badge-sky">{ahc.code}</span>
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 800,
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          backgroundColor: ahc.status === 'OPERATIONAL' ? '#DCFCE7' : '#FEF3C7',
-                          color: ahc.status === 'OPERATIONAL' ? '#166534' : '#92400E',
-                        }}
-                      >
-                        {ahc.status}
-                      </span>
-                    </div>
-
-                    <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-                      {ahc.name}
-                    </h3>
-
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12.5px', color: '#475569', marginBottom: '8px' }}>
-                      <MapPin size={15} style={{ color: '#3A74C2', flexShrink: 0, marginTop: '2px' }} />
-                      <span>{ahc.address}</span>
-                    </div>
-
-                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>
-                      City: <strong>{ahc.city}</strong> • State: <strong>{ahc.state}</strong>
-                    </div>
-
-                    {ahc.contact && (
-                      <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '10px' }}>
-                        Contact: {ahc.contact}
-                      </div>
-                    )}
-
-                    {ahc.services && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {ahc.services.map((srv, idx) => (
-                          <span
-                            key={idx}
-                            style={{
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              backgroundColor: '#F1F6FD',
-                              color: '#39527B',
-                              fontWeight: 500,
-                            }}
-                          >
-                            • {srv}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#64748B' }}>
-                    <span>Capability: <strong>{ahc.metalCapability}</strong></span>
-                    <span>Valid: {ahc.validity}</span>
+                  <span style={{ fontSize: '13px', color: '#64748B' }}>
+                    Showing page <strong style={{ color: '#1D2B42' }}>{currentPage}</strong> of{' '}
+                    <strong style={{ color: '#1D2B42' }}>{totalPages}</strong> ({totalItems} centres)
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '12px', opacity: currentPage <= 1 ? 0.5 : 1 }}
+                    >
+                      &larr; Previous
+                    </button>
+                    <button
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '12px', opacity: currentPage >= totalPages ? 0.5 : 1 }}
+                    >
+                      Next &rarr;
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
 
       {/* ==================================================
-          TAB 2: HALLMARK SCANNER (Per Section 8)
+          TAB 2: HALLMARK SCANNER (Per Section 8 & 17)
           ================================================== */}
       {activeTab === 'scanner' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -480,7 +569,7 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
               Optical Hallmark & HUID Scanner
             </h3>
             <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 20px', lineHeight: 1.5 }}>
-              Upload an image or high-resolution photograph of your gold jewellery hallmark to automatically extract the 6-digit HUID code, verify fineness symbols, and calculate confidence.
+              Upload an image or macro photograph of gold jewellery hallmarks to automatically extract the 6-character HUID, verify purity markings via backend neural vision (/jewellery/scan).
             </p>
 
             {/* Drop Zone Box */}
@@ -504,7 +593,10 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
-                onChange={() => handleSimulateScan('uploaded_jewellery_macro.png')}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleScanFile(file);
+                }}
               />
               <div
                 style={{
@@ -525,34 +617,42 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
                 Drag & drop jewellery photograph, or click to browse
               </div>
               <div style={{ fontSize: '12px', color: '#64748B' }}>
-                Supports JPG, PNG, WEBP macro photographs of hallmark engravings
+                Supports JPG, PNG, WEBP macro photographs of hallmark laser engravings
               </div>
             </div>
 
-            {/* Demo Simulation Action Buttons */}
+            {uploadedImage && (
+              <div style={{ marginBottom: '16px' }}>
+                <img
+                  src={uploadedImage}
+                  alt="Jewellery Preview"
+                  style={{ maxHeight: '180px', borderRadius: '10px', border: '1px solid #D6E4F8', objectFit: 'contain' }}
+                />
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <button
                 type="button"
-                onClick={() => handleSimulateScan('sample_ring_22k.jpg')}
+                onClick={() => fileInputRef.current?.click()}
                 className="btn btn-primary"
                 style={{ height: '42px', padding: '0 20px', fontSize: '13px' }}
                 disabled={isScanning}
               >
-                <Sparkles size={15} />
-                {isScanning ? 'Analyzing Hallmark...' : 'Scan Sample 22K Ring (AB1234)'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSimulateScan('sample_pendant_18k.jpg')}
-                className="btn btn-secondary"
-                style={{ height: '42px', padding: '0 20px', fontSize: '13px' }}
-                disabled={isScanning}
-              >
-                Scan Sample 18K Pendant
+                <Camera size={15} />
+                {isScanning ? 'Processing with Vision Model...' : 'Select Macro Photo to Scan'}
               </button>
             </div>
           </div>
+
+          {scannerError && (
+            <ErrorState
+              title="Hallmark Vision Processing Error"
+              message={scannerError}
+              apiEndpoint="/api/v1/jewellery/scan"
+              onRetry={() => fileInputRef.current?.click()}
+            />
+          )}
 
           {/* Analysis Results View (Per Section 8) */}
           {isScanning ? (
@@ -622,7 +722,7 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
                     {scannerResult.purity}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Metal: {scannerResult.metal} ({scannerResult.purityPercent} Pure)
+                    Metal: {scannerResult.metal} {scannerResult.purityPercent !== 'Not available' ? `(${scannerResult.purityPercent} Pure)` : ''}
                   </div>
                 </div>
 

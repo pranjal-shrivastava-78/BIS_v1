@@ -1,5 +1,6 @@
 import { TestingLab } from '../types';
-import { MOCK_LABORATORIES } from '../data/laboratories';
+import { laboratoriesApi, LaboratoriesFilterParams } from '../api/laboratories';
+import { LaboratoryOut } from '../types/api';
 
 export interface LabQueryParams {
   query?: string;
@@ -7,52 +8,85 @@ export interface LabQueryParams {
   city?: string;
   capability?: string;
   standard?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedLaboratoriesResult {
+  items: TestingLab[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export function mapLaboratoryOutToTestingLab(lab: LaboratoryOut): TestingLab {
+  const labStatus = (lab.status === 'RECOGNIZED' || lab.status === 'AUDIT_PENDING' || lab.status === 'SUSPENDED')
+    ? lab.status
+    : 'RECOGNIZED';
+
+  return {
+    id: lab.id,
+    name: lab.name,
+    code: lab.recognition_code,
+    state: lab.state,
+    district: lab.district || undefined,
+    city: lab.city,
+    address: lab.address || `${lab.city}, ${lab.state}${lab.pincode ? ` - ${lab.pincode}` : ''}`,
+    status: labStatus,
+    validity: lab.valid_until ? `Valid until ${String(lab.valid_until)}` : lab.valid_from ? `Valid from ${String(lab.valid_from)}` : undefined,
+  };
 }
 
 export const laboratoriesService = {
-  getLaboratories: async (params?: LabQueryParams): Promise<TestingLab[]> => {
-    await new Promise((resolve) => setTimeout(resolve, 80));
+  getPaginatedLaboratories: async (params?: LabQueryParams): Promise<PaginatedLaboratoriesResult> => {
+    const apiParams: LaboratoriesFilterParams = {
+      state: params?.state && params.state !== 'ALL' ? params.state : undefined,
+      city: params?.city && params.city !== 'ALL' ? params.city : undefined,
+      is_number: params?.standard && params.standard !== 'ALL' ? params.standard : undefined,
+      page: params?.page || 1,
+      page_size: params?.pageSize || 20,
+    };
 
-    let filtered = [...MOCK_LABORATORIES];
+    const res = await laboratoriesApi.listLaboratories(apiParams);
+    let items = res.items.map(mapLaboratoryOutToTestingLab);
 
     if (params?.query) {
       const q = params.query.toLowerCase().trim();
-      filtered = filtered.filter(
+      items = items.filter(
         (l) =>
           l.name.toLowerCase().includes(q) ||
           l.code.toLowerCase().includes(q) ||
           l.city.toLowerCase().includes(q) ||
           l.state.toLowerCase().includes(q) ||
-          l.address.toLowerCase().includes(q) ||
-          l.accreditedStandards.some((s) => s.toLowerCase().includes(q)) ||
-          l.capabilities.some((c) => c.toLowerCase().includes(q))
+          Boolean(l.address?.toLowerCase().includes(q))
       );
-    }
-
-    if (params?.state && params.state !== 'ALL') {
-      filtered = filtered.filter((l) => l.state === params.state);
-    }
-
-    if (params?.city && params.city !== 'ALL') {
-      filtered = filtered.filter((l) => l.city.toLowerCase().includes(params.city!.toLowerCase()));
     }
 
     if (params?.capability && params.capability !== 'ALL') {
-      filtered = filtered.filter((l) => l.capabilities.includes(params.capability!));
+      items = items.filter((l) => l.capabilities && l.capabilities.includes(params.capability!));
     }
 
-    if (params?.standard && params.standard !== 'ALL') {
-      const s = params.standard.toLowerCase();
-      filtered = filtered.filter((l) =>
-        l.accreditedStandards.some((st) => st.toLowerCase().includes(s))
-      );
-    }
-
-    return filtered;
+    return {
+      items,
+      page: res.pagination.page,
+      pageSize: res.pagination.page_size,
+      totalItems: res.pagination.total_items,
+      totalPages: res.pagination.total_pages,
+      hasNext: res.pagination.has_next,
+      hasPrev: res.pagination.has_prev,
+    };
   },
 
-  getLaboratoryById: async (id: string): Promise<TestingLab | null> => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    return MOCK_LABORATORIES.find((l) => l.id === id) || MOCK_LABORATORIES[0];
+  getLaboratories: async (params?: LabQueryParams): Promise<TestingLab[]> => {
+    const res = await laboratoriesService.getPaginatedLaboratories(params);
+    return res.items;
+  },
+
+  getLaboratoryById: async (recognitionCode: string): Promise<TestingLab> => {
+    const lab = await laboratoriesApi.getLaboratoryByCode(recognitionCode);
+    return mapLaboratoryOutToTestingLab(lab);
   },
 };

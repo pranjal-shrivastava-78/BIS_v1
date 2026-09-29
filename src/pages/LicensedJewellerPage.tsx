@@ -12,6 +12,7 @@ import { NavRoute, LicensedJeweller } from '../types';
 import { jewellersService } from '../services/jewellersService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 
 interface LicensedJewellerPageProps {
   onNavigate: (route: NavRoute, payload?: any) => void;
@@ -27,20 +28,32 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
 
   const [jewellers, setJewellers] = useState<LicensedJeweller[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
-  const states = ['ALL', 'Delhi', 'Karnataka', 'Maharashtra', 'Tamil Nadu', 'Telangana', 'Rajasthan', 'West Bengal'];
+  const states = ['ALL', 'Delhi', 'Karnataka', 'Maharashtra', 'Tamil Nadu', 'Telangana', 'Rajasthan', 'West Bengal', 'Gujarat'];
   const metals = ['ALL', 'Gold', 'Silver', 'Both'];
 
   const fetchJewellers = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const data = await jewellersService.getJewellers({
+      const res = await jewellersService.getPaginatedJewellers({
         query: searchQuery,
-        state: selectedState,
-        city: selectedCity,
-        metal: selectedMetal,
+        state: selectedState !== 'ALL' ? selectedState : undefined,
+        city: selectedCity.trim() || undefined,
+        metal: selectedMetal !== 'ALL' ? selectedMetal : undefined,
+        page: currentPage,
+        pageSize: 20,
       });
-      setJewellers(data);
+      setJewellers(res.items);
+      setTotalPages(res.totalPages);
+      setTotalItems(res.totalItems);
+    } catch (err: any) {
+      setError(err?.message || 'Unable to connect to BIS Parakh jewellers service.');
+      setJewellers([]);
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +61,7 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
 
   useEffect(() => {
     fetchJewellers();
-  }, [searchQuery, selectedState, selectedCity, selectedMetal]);
+  }, [searchQuery, selectedState, selectedCity, selectedMetal, currentPage]);
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -206,8 +219,15 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
       </div>
 
       {/* Content Area */}
-      {isLoading ? (
-        <LoadingSkeleton type="table" count={3} message="Loading licensed jewellers..." />
+      {error ? (
+        <ErrorState
+          title="Unable to Load Licensed Jewellers"
+          message={error}
+          apiEndpoint="/api/v1/jewellers"
+          onRetry={fetchJewellers}
+        />
+      ) : isLoading ? (
+        <LoadingSkeleton type="table" count={3} message="Loading licensed jewellers from BIS registry..." />
       ) : jewellers.length === 0 ? (
         <EmptyState
           icon={Store}
@@ -219,57 +239,100 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
             setSelectedState('ALL');
             setSelectedCity('');
             setSelectedMetal('ALL');
+            setCurrentPage(1);
           }}
         />
       ) : (
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Jeweller Name</th>
-                <th>Licence Number</th>
-                <th>City & State</th>
-                <th>Address</th>
-                <th>Product / Metal Category</th>
-                <th>Contact Information</th>
-                <th>Status</th>
-                <th>Validity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jewellers.map((j) => (
-                <tr key={j.id}>
-                  <td style={{ fontWeight: 800, color: '#1D2B42' }}>
-                    {j.jewellerName}
-                  </td>
-                  <td>
-                    <span style={{ fontWeight: 700, color: '#3A74C2', fontSize: '13px' }}>
-                      {j.licenceNo}
-                    </span>
-                  </td>
-                  <td>
-                    <span style={{ fontWeight: 600, color: '#1E293B' }}>{j.city}</span>, {j.state}
-                  </td>
-                  <td style={{ fontSize: '12px', color: '#64748B', maxWidth: '240px' }}>
-                    {j.address}
-                  </td>
-                  <td>
-                    <span className="badge badge-sky">{j.metalCategory}</span>
-                  </td>
-                  <td style={{ fontSize: '12px', color: '#475569' }}>
-                    {j.contact || 'Registered with State Branch'}
-                  </td>
-                  <td>
-                    <span className="badge badge-verified">{j.status}</span>
-                  </td>
-                  <td style={{ fontSize: '12.5px', color: '#166534', fontWeight: 700 }}>
-                    {j.validTill}
-                  </td>
+        <>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Jeweller Name</th>
+                  <th>Licence Number</th>
+                  <th>City & State</th>
+                  <th>Address</th>
+                  <th>Product / Metal Category</th>
+                  <th>Contact Information</th>
+                  <th>Status</th>
+                  <th>Validity</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {jewellers.map((j) => (
+                  <tr key={j.id}>
+                    <td style={{ fontWeight: 800, color: '#1D2B42' }}>
+                      {j.jewellerName}
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 700, color: '#3A74C2', fontSize: '13px' }}>
+                        {j.licenceNo}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{ fontWeight: 600, color: '#1E293B' }}>{j.city}</span>, {j.state}
+                    </td>
+                    <td style={{ fontSize: '12px', color: '#64748B', maxWidth: '240px' }}>
+                      {j.address}
+                    </td>
+                    <td>
+                      <span className="badge badge-sky">{j.metalCategory}</span>
+                    </td>
+                    <td style={{ fontSize: '12px', color: '#475569' }}>
+                      {j.contact || 'Not available'}
+                    </td>
+                    <td>
+                      <span className="badge badge-verified">{j.status}</span>
+                    </td>
+                    <td style={{ fontSize: '12.5px', color: j.validTill ? '#166534' : '#64748B', fontWeight: j.validTill ? 700 : 500 }}>
+                      {j.validTill || 'Not available'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '12px',
+                padding: '12px 18px',
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #D6E4F8',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              <span style={{ fontSize: '13px', color: '#64748B' }}>
+                Showing page <strong style={{ color: '#1D2B42' }}>{currentPage}</strong> of{' '}
+                <strong style={{ color: '#1D2B42' }}>{totalPages}</strong> ({totalItems} licensed jewellers)
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '12px', opacity: currentPage <= 1 ? 0.5 : 1 }}
+                >
+                  &larr; Previous
+                </button>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '12px', opacity: currentPage >= totalPages ? 0.5 : 1 }}
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

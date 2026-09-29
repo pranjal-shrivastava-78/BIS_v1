@@ -84,30 +84,14 @@ export const ComplianceGapAnalysisPage: React.FC<ComplianceGapAnalysisPageProps>
               Compliance Gap Analysis Engine
             </h1>
             <p style={{ fontSize: '13px', color: '#64748B' }}>
-              Evaluate factory documentation and product testing evidence against statutory BIS clause requirements before official audits.
+              Prototype demonstration: simulate factory documentation evaluation against standard clauses.
             </p>
           </div>
         </div>
 
-        {/* Informational Disclaimer Box (Per Section 13) */}
-        <div
-          style={{
-            marginTop: '14px',
-            backgroundColor: '#FFFBEB',
-            border: '1px solid #FDE68A',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '12.5px',
-            color: '#92400E',
-          }}
-        >
-          <Info size={18} style={{ flexShrink: 0 }} />
-          <span>
-            <strong>Informational Advisory:</strong> The displayed gap analysis is demonstrative diagnostic data intended for internal preparation. It does not constitute an official statutory determination by the Bureau of Indian Standards.
-          </span>
+        <div style={{ marginTop: '14px', padding: '12px 16px', backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '13px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span className="badge badge-warning" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800 }}>Prototype / Demonstration Mode</span>
+          <span>Backend gap-analysis integration is pending. The data shown below is demonstration mock data for interface testing and does not reflect live backend or BIS evaluations.</span>
         </div>
       </div>
 

@@ -20,6 +20,7 @@ import { IndianStandard, NavRoute } from '../types';
 import { standardsService } from '../services/standardsService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 import { SegmentedControl } from '../components/common/SegmentedControl';
 
 interface StandardsExplorerPageProps {
@@ -46,6 +47,10 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
 
   const [standards, setStandards] = useState<IndianStandard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [selectedStandard, setSelectedStandard] = useState<IndianStandard | null>(null);
   const [clauseSearchQuery, setClauseSearchQuery] = useState('');
 
@@ -78,19 +83,27 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
 
   const fetchStandards = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const data = await standardsService.getStandards({
+      const res = await standardsService.getPaginatedStandards({
         query: searchQuery,
         department: selectedDepartment,
         category: selectedCategory,
         year: selectedYear,
         status: selectedStatus,
         qcoOnly: onlyQcoMandatory,
+        page: currentPage,
+        pageSize: 20,
       });
-      setStandards(data);
-      if (data.length > 0 && !selectedStandard) {
-        setSelectedStandard(data[0]);
+      setStandards(res.items);
+      setTotalPages(res.totalPages);
+      setTotalItems(res.totalItems);
+      if (res.items.length > 0 && !selectedStandard) {
+        setSelectedStandard(res.items[0]);
       }
+    } catch (err: any) {
+      setError(err?.message || 'Unable to connect to BIS Parakh standards service.');
+      setStandards([]);
     } finally {
       setIsLoading(false);
     }
@@ -98,9 +111,20 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
 
   useEffect(() => {
     fetchStandards();
-  }, [searchQuery, selectedDepartment, selectedCategory, selectedYear, selectedStatus, onlyQcoMandatory]);
+  }, [searchQuery, selectedDepartment, selectedCategory, selectedYear, selectedStatus, onlyQcoMandatory, currentPage]);
 
-  const filteredClauses = selectedStandard
+  const handleSelectStandard = async (std: IndianStandard) => {
+    setSelectedStandard(std);
+    setActiveTab('detail');
+    try {
+      const live = await standardsService.getStandardById(std.isNumber);
+      if (live) setSelectedStandard(live);
+    } catch {
+      // keep selected standard
+    }
+  };
+
+  const filteredClauses = selectedStandard?.clauses
     ? selectedStandard.clauses.filter((c) => {
         if (!clauseSearchQuery.trim()) return true;
         const q = clauseSearchQuery.toLowerCase().trim();
@@ -191,7 +215,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 label: 'Clause Inspection',
                 number: 3,
                 icon: BookOpen,
-                subtitle: selectedStandard ? `${selectedStandard.clauses.length} Clauses` : undefined,
+                subtitle: selectedStandard ? `${selectedStandard.clauses?.length || 0} Clauses` : undefined,
               },
               {
                 id: 'related',
@@ -356,8 +380,15 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
           </div>
 
           {/* Results List */}
-          {isLoading ? (
-            <LoadingSkeleton type="card" count={3} message="Filtering Indian Standards catalogue..." />
+          {error ? (
+            <ErrorState
+              title="Unable to Load Standards"
+              message={error}
+              apiEndpoint="/api/v1/standards"
+              onRetry={fetchStandards}
+            />
+          ) : isLoading ? (
+            <LoadingSkeleton type="card" count={3} message="Connecting to BIS Standards repository..." />
           ) : standards.length === 0 ? (
             <EmptyState
               icon={BookOpen}
@@ -371,68 +402,110 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 setSelectedYear('ALL');
                 setSelectedStatus('ALL');
                 setOnlyQcoMandatory(false);
+                setCurrentPage(1);
               }}
             />
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
-              {standards.map((s) => (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+                {standards.map((s) => (
+                  <div
+                    key={s.id}
+                    className="card"
+                    style={{
+                      padding: '20px',
+                      backgroundColor: '#FFFFFF',
+                      border: selectedStandard?.id === s.id ? '2px solid #3A74C2' : '1px solid #D6E4F8',
+                      borderRadius: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '15px', fontWeight: 800, color: '#3A74C2' }}>
+                          {s.isNumber}
+                        </span>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {s.year && <span className="badge badge-sky">{s.year}</span>}
+                          {s.qcoMandatory && <span className="badge badge-danger">QCO</span>}
+                        </div>
+                      </div>
+
+                      <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px', lineHeight: 1.35 }}>
+                        {s.title}
+                      </h3>
+
+                      {s.category && (
+                        <div style={{ fontSize: '11.5px', color: '#64748B', marginBottom: '8px' }}>
+                          Category: <strong style={{ color: '#39527B' }}>{s.category}</strong>
+                        </div>
+                      )}
+
+                      <p style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5, marginBottom: '10px' }}>
+                        {s.scope ? (s.scope.length > 130 ? `${s.scope.slice(0, 130)}...` : s.scope) : 'Standard specification catalog entry.'}
+                      </p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: '#64748B' }}>
+                        {s.clauses ? `${s.clauses.length} Clauses` : 'Standard Specification'}{s.certificationScheme ? ` • ${s.certificationScheme}` : ''}
+                      </span>
+                      <button
+                        onClick={() => handleSelectStandard(s)}
+                        className="btn btn-primary btn-sm"
+                        style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '6px' }}
+                      >
+                        Open Standard &rarr;
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
                 <div
-                  key={s.id}
-                  className="card"
                   style={{
-                    padding: '20px',
-                    backgroundColor: '#FFFFFF',
-                    border: selectedStandard?.id === s.id ? '2px solid #3A74C2' : '1px solid #D6E4F8',
-                    borderRadius: '14px',
                     display: 'flex',
-                    flexDirection: 'column',
                     justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: '8px',
+                    padding: '12px 18px',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '12px',
+                    border: '1px solid #D6E4F8',
+                    flexWrap: 'wrap',
                     gap: '12px',
-                    transition: 'all 0.15s ease',
                   }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: 800, color: '#3A74C2' }}>
-                        {s.isNumber}
-                      </span>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        <span className="badge badge-sky">{s.year}</span>
-                        {s.qcoMandatory && <span className="badge badge-danger">QCO</span>}
-                      </div>
-                    </div>
-
-                    <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px', lineHeight: 1.35 }}>
-                      {s.title}
-                    </h3>
-
-                    <div style={{ fontSize: '11.5px', color: '#64748B', marginBottom: '8px' }}>
-                      Category: <strong style={{ color: '#39527B' }}>{s.category}</strong>
-                    </div>
-
-                    <p style={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5, marginBottom: '10px' }}>
-                      {s.scope.length > 130 ? `${s.scope.slice(0, 130)}...` : s.scope}
-                    </p>
-                  </div>
-
-                  <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#64748B' }}>
-                      {s.clauses.length} Clauses • {s.certificationScheme}
-                    </span>
+                  <span style={{ fontSize: '13px', color: '#64748B' }}>
+                    Showing page <strong style={{ color: '#1D2B42' }}>{currentPage}</strong> of{' '}
+                    <strong style={{ color: '#1D2B42' }}>{totalPages}</strong> ({totalItems} total standards)
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
                     <button
-                      onClick={() => {
-                        setSelectedStandard(s);
-                        setActiveTab('detail');
-                      }}
-                      className="btn btn-primary btn-sm"
-                      style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '6px' }}
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '12px', opacity: currentPage <= 1 ? 0.5 : 1 }}
                     >
-                      Open Standard &rarr;
+                      &larr; Previous
+                    </button>
+                    <button
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '12px', opacity: currentPage >= totalPages ? 0.5 : 1 }}
+                    >
+                      Next &rarr;
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -460,7 +533,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 <span style={{ fontSize: '20px', fontWeight: 900, color: '#3A74C2' }}>
                   {selectedStandard.isNumber}
                 </span>
-                <span className="badge badge-sky">Year: {selectedStandard.year}</span>
+                {selectedStandard.year && <span className="badge badge-sky">Year: {selectedStandard.year}</span>}
                 <span className="badge badge-verified">Status: {selectedStandard.status}</span>
                 {selectedStandard.qcoMandatory && <span className="badge badge-danger">Mandatory QCO Enforced</span>}
               </div>
@@ -470,7 +543,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
               </h2>
 
               <div style={{ fontSize: '12.5px', color: '#64748B' }}>
-                Category: <strong>{selectedStandard.category}</strong> • Technical Committee: <strong>{selectedStandard.department}</strong> • Updated: {selectedStandard.lastUpdated}
+                Category: <strong>{selectedStandard.category || 'Not available'}</strong> • Technical Committee: <strong>{selectedStandard.department || 'Not available'}</strong> • Updated: {selectedStandard.lastUpdated || 'Not available'}
               </div>
             </div>
 
@@ -479,7 +552,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 onClick={() => setActiveTab('clauses')}
                 className="btn btn-secondary btn-sm"
               >
-                Inspect Clauses ({selectedStandard.clauses.length})
+                Inspect Clauses ({selectedStandard.clauses?.length || 0})
               </button>
               <button
                 onClick={() => onNavigate('/product-to-standard')}
@@ -505,7 +578,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 Description
               </h4>
               <p style={{ fontSize: '13.5px', color: '#334155', lineHeight: 1.6 }}>
-                {selectedStandard.description || selectedStandard.scope}
+                {selectedStandard.description || selectedStandard.scope || 'No description provided by backend.'}
               </p>
             </div>
 
@@ -514,13 +587,13 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 Scope of Standard
               </h4>
               <p style={{ fontSize: '13.5px', color: '#334155', lineHeight: 1.6 }}>
-                {selectedStandard.scope}
+                {selectedStandard.scope || 'No scope details available from backend.'}
               </p>
             </div>
           </div>
 
           {/* Applicable Products */}
-          {selectedStandard.applicableProducts && (
+          {selectedStandard.applicableProducts && selectedStandard.applicableProducts.length > 0 && (
             <div style={{ border: '1px solid #E2EAF5', borderRadius: '12px', padding: '18px' }}>
               <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#1D2B42', marginBottom: '8px' }}>
                 Applicable Products / Category Items
@@ -558,10 +631,10 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
               </div>
               {selectedStandard.qcoInfo ? (
                 <div style={{ fontSize: '12.5px', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div><strong>QCO Order:</strong> {selectedStandard.qcoInfo.orderTitle}</div>
-                  <div><strong>Notifying Ministry:</strong> {selectedStandard.qcoInfo.ministry}</div>
-                  <div><strong>Enforcement Date:</strong> {selectedStandard.qcoInfo.effectiveDate}</div>
-                  <div><strong>Notification No:</strong> {selectedStandard.qcoInfo.notificationNo}</div>
+                  <div><strong>QCO Order:</strong> {selectedStandard.qcoInfo.orderTitle || 'Not available'}</div>
+                  <div><strong>Notifying Ministry:</strong> {selectedStandard.qcoInfo.ministry || 'Not available'}</div>
+                  <div><strong>Enforcement Date:</strong> {selectedStandard.qcoInfo.effectiveDate || 'Not available'}</div>
+                  <div><strong>Notification No:</strong> {selectedStandard.qcoInfo.notificationNo || 'Not available'}</div>
                   <button
                     onClick={() => onNavigate('/qco-regulations', selectedStandard.isNumber)}
                     style={{ marginTop: '8px', color: '#DC2626', fontWeight: 700, fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}
@@ -585,9 +658,9 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 </h4>
               </div>
               <div style={{ fontSize: '12.5px', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div><strong>Certification Scheme:</strong> {selectedStandard.certificationScheme}</div>
-                <div><strong>Mark / Symbol:</strong> {selectedStandard.certificationInfo?.mark || 'Standard ISI Mark'}</div>
-                <div><strong>Procedure:</strong> {selectedStandard.certificationInfo?.procedure || 'Factory quality audit and lab evaluation per STI.'}</div>
+                <div><strong>Certification Scheme:</strong> {selectedStandard.certificationScheme || 'Not available'}</div>
+                <div><strong>Mark / Symbol:</strong> {selectedStandard.certificationInfo?.mark || 'Not available'}</div>
+                <div><strong>Procedure:</strong> {selectedStandard.certificationInfo?.procedure || 'Not available'}</div>
                 <button
                   onClick={() => onNavigate('/certification', selectedStandard.id)}
                   style={{ marginTop: '8px', color: '#3A74C2', fontWeight: 700, fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}
@@ -602,7 +675,7 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
           <div style={{ border: '1px solid #E2EAF5', borderRadius: '12px', padding: '18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#1D2B42' }}>
-                Important Clauses ({selectedStandard.clauses.length})
+                Important Clauses ({selectedStandard.clauses?.length || 0})
               </h4>
               <button
                 onClick={() => setActiveTab('clauses')}
@@ -612,15 +685,21 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {selectedStandard.clauses.slice(0, 3).map((c, idx) => (
-                <div key={idx} style={{ padding: '10px 14px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: '#3A74C2', marginBottom: '2px' }}>
-                    <span>{c.clauseNumber}: {c.title}</span>
-                    <span style={{ color: '#64748B', fontWeight: 500 }}>{c.page}</span>
+              {selectedStandard.clauses && selectedStandard.clauses.length > 0 ? (
+                selectedStandard.clauses.slice(0, 3).map((c, idx) => (
+                  <div key={idx} style={{ padding: '10px 14px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700, color: '#3A74C2', marginBottom: '2px' }}>
+                      <span>{c.clauseNumber}: {c.title}</span>
+                      <span style={{ color: '#64748B', fontWeight: 500 }}>{c.page}</span>
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: '#475569' }}>{c.text}</div>
                   </div>
-                  <div style={{ fontSize: '12.5px', color: '#475569' }}>{c.text}</div>
+                ))
+              ) : (
+                <div style={{ fontSize: '12.5px', color: '#64748B' }}>
+                  Clause details not provided by backend for this standard.
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -630,22 +709,30 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
               <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#1D2B42', marginBottom: '6px' }}>
                 Amendments & Revisions
               </h4>
-              {selectedStandard.amendments.map((a, idx) => (
-                <div key={idx} style={{ fontSize: '12px', color: '#475569', marginBottom: '4px' }}>
-                  • {a}
-                </div>
-              ))}
+              {selectedStandard.amendments && selectedStandard.amendments.length > 0 ? (
+                selectedStandard.amendments.map((a, idx) => (
+                  <div key={idx} style={{ fontSize: '12px', color: '#475569', marginBottom: '4px' }}>
+                    • {a}
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '12px', color: '#64748B' }}>None reported by backend</div>
+              )}
             </div>
 
             <div style={{ border: '1px solid #E2EAF5', borderRadius: '12px', padding: '16px' }}>
               <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#1D2B42', marginBottom: '6px' }}>
                 Related Standards
               </h4>
-              {selectedStandard.relatedStandards.map((r, idx) => (
-                <div key={idx} style={{ fontSize: '12px', color: '#3A74C2', fontWeight: 600, marginBottom: '4px' }}>
-                  • {r}
-                </div>
-              ))}
+              {selectedStandard.relatedStandards && selectedStandard.relatedStandards.length > 0 ? (
+                selectedStandard.relatedStandards.map((r, idx) => (
+                  <div key={idx} style={{ fontSize: '12px', color: '#3A74C2', fontWeight: 600, marginBottom: '4px' }}>
+                    • {r}
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '12px', color: '#64748B' }}>None reported by backend</div>
+              )}
             </div>
           </div>
 
@@ -678,17 +765,25 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {filteredClauses.map((c, idx) => (
-              <div key={idx} style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#1D2B42' }}>
-                    {c.clauseNumber} — {c.title}
-                  </span>
-                  <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>{c.page}</span>
+            {filteredClauses.length > 0 ? (
+              filteredClauses.map((c, idx) => (
+                <div key={idx} style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#1D2B42' }}>
+                      {c.clauseNumber} — {c.title}
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>{c.page}</span>
+                  </div>
+                  <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.6 }}>{c.text}</p>
                 </div>
-                <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.6 }}>{c.text}</p>
+              ))
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
+                {selectedStandard.clauses && selectedStandard.clauses.length > 0
+                  ? 'No clauses matched your filter.'
+                  : 'Clause text details are not provided by backend for this standard.'}
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
@@ -707,11 +802,15 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 Cross-Referenced Standards
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {selectedStandard.relatedStandards.map((r, idx) => (
-                  <div key={idx} style={{ padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid #E2EAF5', fontSize: '13px', color: '#3A74C2', fontWeight: 600 }}>
-                    {r}
-                  </div>
-                ))}
+                {selectedStandard.relatedStandards && selectedStandard.relatedStandards.length > 0 ? (
+                  selectedStandard.relatedStandards.map((r, idx) => (
+                    <div key={idx} style={{ padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid #E2EAF5', fontSize: '13px', color: '#3A74C2', fontWeight: 600 }}>
+                      {r}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '12.5px', color: '#64748B' }}>None reported by backend</div>
+                )}
               </div>
             </div>
 
@@ -720,11 +819,15 @@ export const StandardsExplorerPage: React.FC<StandardsExplorerPageProps> = ({
                 Gazetted Amendments
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {selectedStandard.amendments.map((a, idx) => (
-                  <div key={idx} style={{ padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid #E2EAF5', fontSize: '12.5px', color: '#475569' }}>
-                    {a}
-                  </div>
-                ))}
+                {selectedStandard.amendments && selectedStandard.amendments.length > 0 ? (
+                  selectedStandard.amendments.map((a, idx) => (
+                    <div key={idx} style={{ padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid #E2EAF5', fontSize: '12.5px', color: '#475569' }}>
+                      {a}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '12.5px', color: '#64748B' }}>None reported by backend</div>
+                )}
               </div>
             </div>
           </div>

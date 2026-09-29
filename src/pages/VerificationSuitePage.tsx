@@ -26,6 +26,7 @@ import {
 import { verificationService } from '../services/verificationService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 import { SegmentedControl } from '../components/common/SegmentedControl';
 
 interface VerificationSuitePageProps {
@@ -41,19 +42,22 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // HUID State
-  const [huidInput, setHuidInput] = useState('AB1234');
+  const [huidInput, setHuidInput] = useState('ABC123');
   const [huidResult, setHuidResult] = useState<HuidVerificationResult | null>(null);
   const [isVerifyingHuid, setIsVerifyingHuid] = useState(false);
+  const [huidError, setHuidError] = useState<string | null>(null);
 
   // Licence State
-  const [licenceInput, setLicenceInput] = useState('CM/L-7200142981');
+  const [licenceInput, setLicenceInput] = useState('CM/L-1234567');
   const [licenceResult, setLicenceResult] = useState<LicenceVerificationResult | null>(null);
   const [isVerifyingLicence, setIsVerifyingLicence] = useState(false);
+  const [licenceError, setLicenceError] = useState<string | null>(null);
 
   // CRS State
-  const [crsInput, setCrsInput] = useState('R-41001234');
+  const [crsInput, setCrsInput] = useState('R-12345678');
   const [crsResult, setCrsResult] = useState<CrsVerificationResult | null>(null);
   const [isVerifyingCrs, setIsVerifyingCrs] = useState(false);
+  const [crsError, setCrsError] = useState<string | null>(null);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -65,33 +69,51 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
     const val = (overrideValue || huidInput).trim();
     if (!val) return;
     setIsVerifyingHuid(true);
+    setHuidError(null);
     setHuidResult(null);
 
-    const result = await verificationService.verifyHuid(val);
-    setHuidResult(result);
-    setIsVerifyingHuid(false);
+    try {
+      const result = await verificationService.verifyHuid(val);
+      setHuidResult(result);
+    } catch (err: any) {
+      setHuidError(err?.message || 'HUID verification service could not be reached.');
+    } finally {
+      setIsVerifyingHuid(false);
+    }
   };
 
   const handleVerifyLicence = async (overrideValue?: string) => {
     const val = (overrideValue || licenceInput).trim();
     if (!val) return;
     setIsVerifyingLicence(true);
+    setLicenceError(null);
     setLicenceResult(null);
 
-    const result = await verificationService.verifyLicence(val);
-    setLicenceResult(result);
-    setIsVerifyingLicence(false);
+    try {
+      const result = await verificationService.verifyLicence(val);
+      setLicenceResult(result);
+    } catch (err: any) {
+      setLicenceError(err?.message || 'Licence verification service could not be reached.');
+    } finally {
+      setIsVerifyingLicence(false);
+    }
   };
 
   const handleVerifyCrs = async (overrideValue?: string) => {
     const val = (overrideValue || crsInput).trim();
     if (!val) return;
     setIsVerifyingCrs(true);
+    setCrsError(null);
     setCrsResult(null);
 
-    const result = await verificationService.verifyCrs(val);
-    setCrsResult(result);
-    setIsVerifyingCrs(false);
+    try {
+      const result = await verificationService.verifyCrs(val);
+      setCrsResult(result);
+    } catch (err: any) {
+      setCrsError(err?.message || 'CRS verification service could not be reached.');
+    } finally {
+      setIsVerifyingCrs(false);
+    }
   };
 
   return (
@@ -231,8 +253,8 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
 
             {/* Quick Demo Preloads */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Demo Examples:</span>
-              {['AB1234', 'XY9876', '7K2M9P'].map((code) => (
+              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Sample HUIDs:</span>
+              {['ABC123', 'GLD916', 'DIA750', 'SIL925', 'K98L2M'].map((code) => (
                 <button
                   key={code}
                   onClick={() => {
@@ -255,6 +277,15 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
               ))}
             </div>
           </div>
+
+          {huidError && (
+            <ErrorState
+              title="HUID Verification Service Error"
+              message={huidError}
+              apiEndpoint="/api/v1/verification/huid"
+              onRetry={() => handleVerifyHuid()}
+            />
+          )}
 
           {/* Results Area */}
           {isVerifyingHuid ? (
@@ -344,10 +375,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     1. Jewellery Details
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '2px' }}>
-                    {huidResult.articleType || 'Gold Jewellery Article'}
+                    {huidResult.articleType || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12.5px', color: '#475569' }}>
-                    Gross / Net Weight: <strong>{huidResult.articleWeight || '8.450 grams'}</strong>
+                    Gross / Net Weight: <strong>{huidResult.articleWeight || 'Not available'}</strong>
                   </div>
                 </div>
 
@@ -357,10 +388,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     2. Metal & Purity Fineness
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#B45309', marginBottom: '2px' }}>
-                    {huidResult.metalFineness || '22K (916 fineness)'}
+                    {huidResult.metalFineness || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12.5px', color: '#475569' }}>
-                    Certified Metal: <strong>{huidResult.metal || 'Gold'}</strong> ({huidResult.purityPercent || '91.6% Pure'})
+                    Certified Metal: <strong>{huidResult.metal || 'Not available'}</strong> ({huidResult.purityPercent ? `${huidResult.purityPercent} Pure` : 'Not available'})
                   </div>
                 </div>
 
@@ -370,13 +401,13 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     3. Registered Jeweller
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '2px' }}>
-                    {huidResult.jewellerName || 'Licensed Jeweller'}
+                    {huidResult.jewellerName || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#475569' }}>
-                    Reg No: <span style={{ color: '#3A74C2', fontWeight: 700 }}>{huidResult.jewellerRegNo || 'HM/C-7800041239'}</span>
+                    Reg No: <span style={{ color: '#3A74C2', fontWeight: 700 }}>{huidResult.jewellerRegNo || 'Not available'}</span>
                   </div>
                   <div style={{ fontSize: '11.5px', color: '#64748B' }}>
-                    {huidResult.jewellerCity || 'New Delhi'}
+                    {huidResult.jewellerCity || 'Not available'}
                   </div>
                 </div>
 
@@ -386,10 +417,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     4. Assaying & Hallmarking Centre (AHC)
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '2px' }}>
-                    {huidResult.ahcName || 'Recognized AHC'}
+                    {huidResult.ahcName || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#475569' }}>
-                    AHC Code: <span style={{ fontWeight: 700, color: '#3A74C2' }}>{huidResult.ahcCode || 'AHC-DL-0012'}</span>
+                    AHC Code: <span style={{ fontWeight: 700, color: '#3A74C2' }}>{huidResult.ahcCode || 'Not available'}</span>
                   </div>
                 </div>
 
@@ -399,7 +430,7 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     5. Hallmark Details & Date
                   </div>
                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#1D2B42', marginBottom: '2px' }}>
-                    Marking Date: {huidResult.hallmarkingDate || '18 September 2026'}
+                    Marking Date: {huidResult.hallmarkingDate || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#475569' }}>
                     Marks Verified: BIS Triangle Logo + Karat/Fineness + 6-Digit HUID
@@ -502,12 +533,11 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
 
             {/* Demo Preloads */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Demo Licences:</span>
+              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Sample Licences:</span>
               {[
-                { label: 'Insulated Bottles', code: 'CM/L-7200142981' },
-                { label: 'Packaged Water', code: 'CM/L-8400021945' },
-                { label: 'Plugs & Sockets', code: 'CM/L-1234567890' },
-                { label: 'Cement 53G', code: 'CM/L-5500012345' },
+                { label: 'Insulated Bottles', code: 'CM/L-1234567' },
+                { label: 'Standard Mark', code: 'CM/L-7200142' },
+                { label: 'Packaged Goods', code: 'CM/L-8400021' },
               ].map((item) => (
                 <button
                   key={item.code}
@@ -526,11 +556,20 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     cursor: 'pointer',
                   }}
                 >
-                  {item.label}
+                  {item.label} ({item.code})
                 </button>
               ))}
             </div>
           </div>
+
+          {licenceError && (
+            <ErrorState
+              title="Licence Verification Service Error"
+              message={licenceError}
+              apiEndpoint="/api/v1/verification/licence"
+              onRetry={() => handleVerifyLicence()}
+            />
+          )}
 
           {isVerifyingLicence ? (
             <LoadingSkeleton type="detail" count={1} message="Searching e-Manak central licence repository..." />
@@ -615,10 +654,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Manufacturer / Company
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '4px' }}>
-                    {licenceResult.licenseeName}
+                    {licenceResult.licenseeName || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Factory: {licenceResult.factoryAddress}
+                    Factory: {licenceResult.factoryAddress || 'Not available'}
                   </div>
                 </div>
 
@@ -627,10 +666,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Product & Brand
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#3A74C2', marginBottom: '4px' }}>
-                    {licenceResult.productName}
+                    {licenceResult.productName || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#1E293B', fontWeight: 600 }}>
-                    Brand Name: {licenceResult.brand}
+                    Brand Name: {licenceResult.brand || 'Not available'}
                   </div>
                 </div>
 
@@ -639,7 +678,7 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Indian Standard (IS)
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '4px' }}>
-                    {licenceResult.isNumber}
+                    {licenceResult.isNumber || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
                     Scheme: {licenceResult.scheme || 'Scheme I (ISI Mark)'}
@@ -651,10 +690,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Validity & Certification Details
                   </div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#166534', marginBottom: '4px' }}>
-                    Valid Till: {licenceResult.validTill}
+                    Valid Till: {licenceResult.validTill || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#475569' }}>
-                    {licenceResult.certificationDetails}
+                    {licenceResult.certificationDetails || 'Not available'}
                   </div>
                 </div>
               </div>
@@ -755,6 +794,15 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
             </div>
           </div>
 
+          {crsError && (
+            <ErrorState
+              title="CRS Registration Verification Error"
+              message={crsError}
+              apiEndpoint="/api/v1/verification/r-number"
+              onRetry={() => handleVerifyCrs()}
+            />
+          )}
+
           {isVerifyingCrs ? (
             <LoadingSkeleton type="detail" count={1} message="Checking MeitY-BIS Compulsory Registration Portal..." />
           ) : crsResult ? (
@@ -838,10 +886,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Manufacturer / Brand Owner
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '4px' }}>
-                    {crsResult.companyName}
+                    {crsResult.companyName || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Scope: {crsResult.registrationDetails}
+                    Scope: {crsResult.registrationDetails || 'Not available'}
                   </div>
                 </div>
 
@@ -850,10 +898,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Product Category & Standard
                   </div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#3A74C2', marginBottom: '4px' }}>
-                    {crsResult.productCategory}
+                    {crsResult.productCategory || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12.5px', color: '#1E293B', fontWeight: 600 }}>
-                    Standard: {crsResult.isStandard}
+                    Standard: {crsResult.isStandard || 'Not available'}
                   </div>
                 </div>
 
@@ -862,7 +910,7 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Authorized Model Numbers
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    {(crsResult.modelNumbers || ['Default Base Model']).map((m, idx) => (
+                    {(crsResult.modelNumbers && crsResult.modelNumbers.length > 0 ? crsResult.modelNumbers : ['Not available']).map((m, idx) => (
                       <span key={idx} style={{ fontSize: '12.5px', color: '#1D2B42', fontWeight: 600 }}>
                         • {m}
                       </span>
@@ -875,10 +923,10 @@ export const VerificationSuitePage: React.FC<VerificationSuitePageProps> = ({
                     Validity & Portal Status
                   </div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#166534', marginBottom: '4px' }}>
-                    Valid Till: {crsResult.validTill}
+                    Valid Till: {crsResult.validTill || 'Not available'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Self-Declaration: "Conforms to {crsResult.isStandard} R-{crsResult.rNumber.replace(/^R-/, '')}"
+                    Self-Declaration: {crsResult.isStandard && crsResult.rNumber ? `"Conforms to ${crsResult.isStandard} R-${crsResult.rNumber.replace(/^R-/, '')}"` : 'Not available'}
                   </div>
                 </div>
               </div>

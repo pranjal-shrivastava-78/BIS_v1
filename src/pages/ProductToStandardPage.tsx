@@ -15,6 +15,7 @@ import {
 import { NavRoute } from '../types';
 import { standardsService } from '../services/standardsService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { ErrorState } from '../components/common/ErrorState';
 
 interface ProductToStandardPageProps {
   onNavigate: (route: NavRoute, payload?: any) => void;
@@ -33,6 +34,7 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
   const [matchingResults, setMatchingResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const presets = [
     {
@@ -80,6 +82,7 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
 
     setIsSearching(true);
     setHasSearched(true);
+    setSearchError(null);
     try {
       const results = await standardsService.matchProductToStandards(
         `${productName} ${description}`,
@@ -87,6 +90,9 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
         optionalKeywords
       );
       setMatchingResults(results);
+    } catch (err: any) {
+      setSearchError(err.message || 'Failed to map product to standards via Parakh backend.');
+      setMatchingResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -323,6 +329,15 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
 
         {/* Right Column: Matching Standards Output */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {searchError && (
+            <ErrorState
+              title="Product Mapping Error"
+              message={searchError}
+              apiEndpoint="/api/v1/certification/map-product"
+              onRetry={() => handleFindStandards()}
+            />
+          )}
+
           {isSearching ? (
             <LoadingSkeleton type="card" count={2} message="Extracting attributes and querying Indian Standards registry..." />
           ) : matchingResults.length > 0 ? (
@@ -356,13 +371,16 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '18px', fontWeight: 900, color: '#3A74C2' }}>
-                          {s.isNumber}
+                          {s.candidate_standard || s.isNumber}
                         </span>
-                        <span className="badge badge-sky">{s.year}</span>
-                        {s.qcoMandatory && <span className="badge badge-danger">Mandatory QCO</span>}
+                        {s.is_mandatory || s.qcoMandatory ? (
+                          <span className="badge badge-danger">Mandatory QCO</span>
+                        ) : (
+                          <span className="badge badge-sky">Voluntary</span>
+                        )}
                       </div>
                       <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
-                        {s.title}
+                        {s.standard_title || s.title}
                       </h4>
                     </div>
 
@@ -377,13 +395,13 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
                         border: '1px solid #86EFAC',
                       }}
                     >
-                      {s.relevance}% Match
+                      {s.relevance || Math.round((s.confidence || 0) * 100)}% Match
                     </span>
                   </div>
 
-                  {/* Relevance & Explanation */}
+                  {/* Relevance & Reasoning */}
                   <div style={{ padding: '12px 14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5', fontSize: '13px', color: '#334155' }}>
-                    <strong>Relevance / Explanation:</strong> {s.explanation}
+                    <strong>Reasoning:</strong> {s.reasoning || s.explanation || 'Identified based on product attributes and statutory standards catalog.'}
                   </div>
 
                   {/* Applicable QCO & Certification Requirement */}
@@ -393,7 +411,7 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
                         <Scale size={14} /> Applicable QCO Order
                       </div>
                       <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#78350F', marginTop: '4px' }}>
-                        {s.applicableQco}
+                        {s.applicable_qco || s.applicableQco || 'None / Not available'}
                       </div>
                     </div>
 
@@ -402,22 +420,15 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
                         <Award size={14} /> Certification Requirement
                       </div>
                       <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#0C4A6E', marginTop: '4px' }}>
-                        {s.certificationRequirement}
+                        {s.certification_scheme || s.certificationRequirement || 'Not provided by backend'}
                       </div>
                     </div>
                   </div>
 
-                  {/* Related Standards */}
-                  {s.relatedStandards && s.relatedStandards.length > 0 && (
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>
-                      <strong>Related Standards:</strong> {s.relatedStandards.join(' • ')}
-                    </div>
-                  )}
-
                   {/* Action CTAs */}
                   <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <button
-                      onClick={() => onNavigate('/standards', s.isNumber)}
+                      onClick={() => onNavigate('/standards', s.candidate_standard || s.isNumber)}
                       className="btn btn-primary btn-sm"
                     >
                       Open Standard Detail &rarr;

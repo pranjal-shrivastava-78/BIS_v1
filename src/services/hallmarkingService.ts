@@ -1,48 +1,96 @@
 import { HallmarkingCentre } from '../types';
-import { MOCK_AHC_CENTRES } from '../data/hallmarking';
+import { hallmarkingApi, HallmarkingFilterParams } from '../api/hallmarking';
+import { AHCCentreOut } from '../types/api';
 
 export interface AhcQueryParams {
   state?: string;
   city?: string;
   query?: string;
   status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedAhcResult {
+  items: HallmarkingCentre[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+export function mapAHCCentreOutToHallmarkingCentre(ahc: AHCCentreOut): HallmarkingCentre {
+  const caps = ahc.metal_capabilities || [];
+  const metalCap: 'Gold (Au)' | 'Silver (Ag)' | 'Gold & Silver' | undefined =
+    caps.includes('GOLD') && caps.includes('SILVER')
+      ? 'Gold & Silver'
+      : caps.includes('SILVER')
+      ? 'Silver (Ag)'
+      : caps.includes('GOLD')
+      ? 'Gold (Au)'
+      : undefined;
+
+  const statusFormatted: 'OPERATIONAL' | 'RECOGNITION_EXPIRED' | 'AUDIT_IN_PROGRESS' =
+    ahc.status === 'ACTIVE' || ahc.status === 'OPERATIONAL'
+      ? 'OPERATIONAL'
+      : ahc.status === 'AUDIT_IN_PROGRESS'
+      ? 'AUDIT_IN_PROGRESS'
+      : 'RECOGNITION_EXPIRED';
+
+  return {
+    id: ahc.id,
+    name: ahc.name,
+    code: ahc.recognition_number,
+    state: ahc.state,
+    city: ahc.city,
+    address: [ahc.city, ahc.district, ahc.state].filter(Boolean).join(', '),
+    metalCapability: metalCap,
+    status: statusFormatted,
+  };
 }
 
 export const hallmarkingService = {
-  getAhcCentres: async (params?: AhcQueryParams): Promise<HallmarkingCentre[]> => {
-    await new Promise((resolve) => setTimeout(resolve, 80));
+  getPaginatedAhcCentres: async (params?: AhcQueryParams): Promise<PaginatedAhcResult> => {
+    const apiParams: HallmarkingFilterParams = {
+      state: params?.state && params.state !== 'ALL' ? params.state : undefined,
+      city: params?.city && params.city !== 'ALL' ? params.city : undefined,
+      page: params?.page || 1,
+      page_size: params?.pageSize || 20,
+    };
 
-    let filtered = [...MOCK_AHC_CENTRES];
+    const res = await hallmarkingApi.listCentres(apiParams);
+    let items = res.items.map(mapAHCCentreOutToHallmarkingCentre);
 
     if (params?.query) {
       const q = params.query.toLowerCase().trim();
-      filtered = filtered.filter(
+      items = items.filter(
         (a) =>
           a.name.toLowerCase().includes(q) ||
           a.city.toLowerCase().includes(q) ||
           a.code.toLowerCase().includes(q) ||
-          a.address.toLowerCase().includes(q) ||
-          (a.services && a.services.some((s) => s.toLowerCase().includes(q)))
+          a.state.toLowerCase().includes(q)
       );
     }
 
-    if (params?.state && params.state !== 'ALL') {
-      filtered = filtered.filter((a) => a.state === params.state);
-    }
-
-    if (params?.city && params.city !== 'ALL') {
-      filtered = filtered.filter((a) => a.city.toLowerCase().includes(params.city!.toLowerCase()));
-    }
-
     if (params?.status && params.status !== 'ALL') {
-      filtered = filtered.filter((a) => a.status === params.status);
+      items = items.filter((a) => a.status === params.status);
     }
 
-    return filtered;
+    return {
+      items,
+      page: res.pagination.page,
+      pageSize: res.pagination.page_size,
+      totalItems: res.pagination.total_items,
+      totalPages: res.pagination.total_pages,
+      hasNext: res.pagination.has_next,
+      hasPrev: res.pagination.has_prev,
+    };
   },
 
-  getAhcById: async (id: string): Promise<HallmarkingCentre | null> => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    return MOCK_AHC_CENTRES.find((a) => a.id === id) || MOCK_AHC_CENTRES[0];
+  getAhcCentres: async (params?: AhcQueryParams): Promise<HallmarkingCentre[]> => {
+    const res = await hallmarkingService.getPaginatedAhcCentres(params);
+    return res.items;
   },
 };

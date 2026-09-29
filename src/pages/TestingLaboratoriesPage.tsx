@@ -15,6 +15,7 @@ import { NavRoute, TestingLab } from '../types';
 import { laboratoriesService } from '../services/laboratoriesService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 import { Modal } from '../components/common/Modal';
 
 interface TestingLaboratoriesPageProps {
@@ -34,23 +35,35 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
 
   const [labs, setLabs] = useState<TestingLab[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [selectedLab, setSelectedLab] = useState<TestingLab | null>(null);
 
-  const states = ['ALL', 'Uttar Pradesh', 'Delhi', 'Karnataka', 'Gujarat', 'Haryana', 'Tamil Nadu', 'Telangana'];
+  const states = ['ALL', 'Uttar Pradesh', 'Delhi', 'Karnataka', 'Gujarat', 'Haryana', 'Tamil Nadu', 'Telangana', 'Maharashtra'];
   const capabilities = ['ALL', 'Chemical', 'Mechanical', 'Electrical', 'Microbiological', 'Civil & Building Materials', 'Electronics & Battery Testing', 'Precious Metals'];
-  const standardsList = ['ALL', 'IS 17526', 'IS 9873', 'IS 14543', 'IS 1293', 'IS 16046', 'IS 269', 'IS 15885'];
+  const standardsList = ['ALL', 'IS 17803', 'IS 1417', 'IS 1293', 'IS 16046', 'IS 13252'];
 
   const fetchLabs = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const data = await laboratoriesService.getLaboratories({
+      const res = await laboratoriesService.getPaginatedLaboratories({
         query: searchQuery,
-        state: selectedState,
-        city: selectedCity,
-        capability: selectedCapability,
+        state: selectedState !== 'ALL' ? selectedState : undefined,
+        city: selectedCity.trim() || undefined,
+        capability: selectedCapability !== 'ALL' ? selectedCapability : undefined,
         standard: selectedStandard !== 'ALL' ? selectedStandard : undefined,
+        page: currentPage,
+        pageSize: 20,
       });
-      setLabs(data);
+      setLabs(res.items);
+      setTotalPages(res.totalPages);
+      setTotalItems(res.totalItems);
+    } catch (err: any) {
+      setError(err?.message || 'Unable to connect to BIS Parakh laboratories service.');
+      setLabs([]);
     } finally {
       setIsLoading(false);
     }
@@ -58,7 +71,7 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
 
   useEffect(() => {
     fetchLabs();
-  }, [searchQuery, selectedState, selectedCity, selectedStandard, selectedCapability]);
+  }, [searchQuery, selectedState, selectedCity, selectedStandard, selectedCapability, currentPage]);
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -242,8 +255,15 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
       </div>
 
       {/* Laboratories Cards Grid */}
-      {isLoading ? (
-        <LoadingSkeleton type="card" count={3} message="Searching testing laboratories..." />
+      {error ? (
+        <ErrorState
+          title="Unable to Load Testing Laboratories"
+          message={error}
+          apiEndpoint="/api/v1/laboratories"
+          onRetry={fetchLabs}
+        />
+      ) : isLoading ? (
+        <LoadingSkeleton type="card" count={3} message="Searching testing laboratories in BIS registry..." />
       ) : labs.length === 0 ? (
         <EmptyState
           icon={FlaskConical}
@@ -256,118 +276,165 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
             setSelectedCity('');
             setSelectedStandard('ALL');
             setSelectedCapability('ALL');
+            setCurrentPage(1);
           }}
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
-          {labs.map((lab) => (
-            <div
-              key={lab.id}
-              className="card"
-              style={{
-                padding: '22px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #D6E4F8',
-                borderRadius: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                gap: '14px',
-                boxShadow: '0 2px 6px rgba(30, 41, 59, 0.04)',
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-                  <span className="badge badge-sky">{lab.code}</span>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      backgroundColor: lab.status === 'RECOGNIZED' ? '#DCFCE7' : '#FEF3C7',
-                      color: lab.status === 'RECOGNIZED' ? '#166534' : '#92400E',
-                    }}
-                  >
-                    {lab.status}
-                  </span>
-                </div>
-
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-                  {lab.name}
-                </h3>
-
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12.5px', color: '#475569', marginBottom: '8px' }}>
-                  <MapPin size={15} style={{ color: '#3A74C2', flexShrink: 0, marginTop: '2px' }} />
-                  <span>{lab.address}</span>
-                </div>
-
-                {/* Capabilities */}
-                <div style={{ marginBottom: '10px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Testing Capabilities:
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {lab.capabilities.map((c, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          fontSize: '11px',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: '#F1F6FD',
-                          color: '#39527B',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Supported Standards */}
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+            {labs.map((lab) => (
+              <div
+                key={lab.id}
+                className="card"
+                style={{
+                  padding: '22px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #D6E4F8',
+                  borderRadius: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                  boxShadow: '0 2px 6px rgba(30, 41, 59, 0.04)',
+                }}
+              >
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Accredited Standards:
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                    <span className="badge badge-sky">{lab.code}</span>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        backgroundColor: lab.status === 'RECOGNIZED' ? '#DCFCE7' : '#FEF3C7',
+                        color: lab.status === 'RECOGNIZED' ? '#166534' : '#92400E',
+                      }}
+                    >
+                      {lab.status}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {lab.accreditedStandards.map((st, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          fontSize: '11px',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #D6E4F8',
-                          color: '#3A74C2',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {st}
-                      </span>
-                    ))}
+
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
+                    {lab.name}
+                  </h3>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12.5px', color: '#475569', marginBottom: '8px' }}>
+                    <MapPin size={15} style={{ color: '#3A74C2', flexShrink: 0, marginTop: '2px' }} />
+                    <span>{lab.address}</span>
                   </div>
+
+                  {/* Capabilities */}
+                  {lab.capabilities && lab.capabilities.length > 0 && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        Testing Capabilities:
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {lab.capabilities.map((c, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: '#F1F6FD',
+                              color: '#39527B',
+                              fontWeight: 500,
+                            }}
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Supported Standards */}
+                  {lab.accreditedStandards && lab.accreditedStandards.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        Accredited Standards:
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {lab.accreditedStandards.map((st, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #D6E4F8',
+                              color: '#3A74C2',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {st}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom Actions & Details */}
+                <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11.5px', color: '#64748B' }}>
+                    Validity: {lab.validity || 'Not available'}
+                  </span>
+                  <button
+                    onClick={() => setSelectedLab(lab)}
+                    className="btn btn-primary btn-sm"
+                    style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '6px' }}
+                  >
+                    View Details &rarr;
+                  </button>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Bottom Actions & Details */}
-              <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11.5px', color: '#64748B' }}>
-                  Validity: {lab.validity}
-                </span>
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '8px',
+                padding: '12px 18px',
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #D6E4F8',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}
+            >
+              <span style={{ fontSize: '13px', color: '#64748B' }}>
+                Showing page <strong style={{ color: '#1D2B42' }}>{currentPage}</strong> of{' '}
+                <strong style={{ color: '#1D2B42' }}>{totalPages}</strong> ({totalItems} testing facilities)
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={() => setSelectedLab(lab)}
-                  className="btn btn-primary btn-sm"
-                  style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '6px' }}
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '12px', opacity: currentPage <= 1 ? 0.5 : 1 }}
                 >
-                  View Services &rarr;
+                  &larr; Previous
+                </button>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '12px', opacity: currentPage >= totalPages ? 0.5 : 1 }}
+                >
+                  Next &rarr;
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* Laboratory Detail Modal (Per Section 9) */}
@@ -393,17 +460,23 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
               </div>
             </div>
 
-            <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
-              <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600 }}>CONTACT INFORMATION</div>
-              <div style={{ fontSize: '13px', color: '#1D2B42', marginTop: '4px' }}>
-                Phone: <strong>{selectedLab.contact}</strong>
+            {(selectedLab.contact || selectedLab.email) && (
+              <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600 }}>CONTACT INFORMATION</div>
+                {selectedLab.contact && (
+                  <div style={{ fontSize: '13px', color: '#1D2B42', marginTop: '4px' }}>
+                    Phone: <strong>{selectedLab.contact}</strong>
+                  </div>
+                )}
+                {selectedLab.email && (
+                  <div style={{ fontSize: '13px', color: '#1D2B42', marginTop: '2px' }}>
+                    Email: <strong>{selectedLab.email}</strong>
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: '13px', color: '#1D2B42', marginTop: '2px' }}>
-                Email: <strong>{selectedLab.email}</strong>
-              </div>
-            </div>
+            )}
 
-            {selectedLab.services && (
+            {selectedLab.services && selectedLab.services.length > 0 && (
               <div>
                 <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
                   Laboratory Services Offered
@@ -418,38 +491,44 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
               </div>
             )}
 
-            <div>
-              <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
-                Accredited Standards
-              </h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {selectedLab.accreditedStandards.map((st, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      setSelectedLab(null);
-                      onNavigate('/standards', st);
-                    }}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #3A74C2',
-                      color: '#3A74C2',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {st} &rarr;
-                  </button>
-                ))}
+            {selectedLab.accreditedStandards && selectedLab.accreditedStandards.length > 0 && (
+              <div>
+                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+                  Accredited Standards
+                </h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {selectedLab.accreditedStandards.map((st, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setSelectedLab(null);
+                        onNavigate('/standards', st);
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #3A74C2',
+                        color: '#3A74C2',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {st} &rarr;
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '10px', fontSize: '11.5px', color: '#64748B' }}>
-              Source: <strong>{selectedLab.officialSource}</strong> • Last Verified: {selectedLab.lastVerified}
-            </div>
+            {(selectedLab.officialSource || selectedLab.lastVerified) && (
+              <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '10px', fontSize: '11.5px', color: '#64748B' }}>
+                {selectedLab.officialSource && <>Source: <strong>{selectedLab.officialSource}</strong></>}
+                {selectedLab.officialSource && selectedLab.lastVerified && ' • '}
+                {selectedLab.lastVerified && <>Last Verified: {selectedLab.lastVerified}</>}
+              </div>
+            )}
           </div>
         </Modal>
       )}

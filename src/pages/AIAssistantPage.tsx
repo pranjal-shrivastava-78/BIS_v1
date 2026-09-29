@@ -31,25 +31,11 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   initialPrompt,
   onNavigate,
 }) => {
-  const [conversations, setConversations] = useState<ConversationHistoryItem[]>([
-    {
-      id: 'conv-01',
-      title: 'BIS Regulatory & Standards Inquiry',
-      preview: 'Namaste! I am the BIS Parakh AI Assistant...',
-      timestamp: 'Today',
-      messageCount: 2,
-    },
-    {
-      id: 'conv-02',
-      title: 'HUID & Gold Jewellery Traceability',
-      preview: 'How do I verify a HUID code...',
-      timestamp: 'Yesterday',
-      messageCount: 4,
-    },
-  ]);
-
-  const [activeConvId, setActiveConvId] = useState<string>('conv-01');
+  const [conversations, setConversations] = useState<ConversationHistoryItem[]>([]);
+  const [isLoadingConvs, setIsLoadingConvs] = useState<boolean>(true);
+  const [activeConvId, setActiveConvId] = useState<string | undefined>(undefined);
   const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -72,6 +58,22 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const processedPromptRef = useRef<string | null>(null);
 
+  const loadConversations = async () => {
+    setIsLoadingConvs(true);
+    try {
+      const convList = await chatService.getConversations();
+      setConversations(convList);
+    } catch (err) {
+      console.warn('Could not load chat conversations from backend:', err);
+    } finally {
+      setIsLoadingConvs(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
   // Auto-scroll on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,6 +86,26 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
       handleSendMessage(initialPrompt.trim());
     }
   }, [initialPrompt]);
+
+  const handleSelectConversation = async (convId: string) => {
+    setActiveConvId(convId);
+    setChatError(null);
+    setIsTyping(true);
+    try {
+      const convMsgs = await chatService.getConversationMessages(convId);
+      if (convMsgs.length > 0) {
+        setMessages(convMsgs);
+        const lastMsgWithCitations = [...convMsgs].reverse().find(m => m.citations && m.citations.length > 0);
+        if (lastMsgWithCitations && lastMsgWithCitations.citations) {
+          setSelectedCitation(lastMsgWithCitations.citations[0]);
+        }
+      }
+    } catch (err: any) {
+      setChatError(err.message || 'Failed to load conversation history from backend.');
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
   const handleSendMessage = async (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
@@ -99,33 +121,30 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
     setMessages((prev) => [...prev, userMsg]);
     if (!textToSend) setInputText('');
     setIsTyping(true);
+    setChatError(null);
 
     try {
-      const historyContext = messages.map((m) => ({ sender: m.sender, text: m.text }));
-      const aiResponse = await chatService.sendMessage(query, historyContext);
+      const aiResponse = await chatService.sendMessage(query, activeConvId);
 
       setMessages((prev) => [...prev, aiResponse]);
       if (aiResponse.citations && aiResponse.citations.length > 0) {
         setSelectedCitation(aiResponse.citations[0]);
       }
+      if (aiResponse.conversation_id) {
+        setActiveConvId(aiResponse.conversation_id);
+        loadConversations();
+      }
+    } catch (err: any) {
+      setChatError(err.message || 'The Parakh AI Assistant service could not be reached. Please check the backend connection and try again.');
     } finally {
       setIsTyping(false);
     }
   };
 
   const handleStartNewChat = () => {
-    const newId = `conv-${Date.now()}`;
-    setConversations([
-      {
-        id: newId,
-        title: 'New Inquiry Session',
-        preview: 'New inquiry...',
-        timestamp: 'Just now',
-        messageCount: 1,
-      },
-      ...conversations,
-    ]);
-    setActiveConvId(newId);
+    setActiveConvId(undefined);
+    setChatError(null);
+    setSelectedCitation(null);
     setMessages([
       {
         id: `msg-${Date.now()}`,
@@ -137,6 +156,9 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
   };
 
   const handleClearConversation = () => {
+    setActiveConvId(undefined);
+    setChatError(null);
+    setSelectedCitation(null);
     setMessages([
       {
         id: `msg-${Date.now()}`,
@@ -224,27 +246,37 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {conversations.map((c) => (
-                <div
-                  key={c.id}
-                  onClick={() => setActiveConvId(c.id)}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    backgroundColor: activeConvId === c.id ? '#FFFFFF' : 'transparent',
-                    border: activeConvId === c.id ? '1px solid #D6E4F8' : '1px solid transparent',
-                    cursor: 'pointer',
-                    boxShadow: activeConvId === c.id ? '0 1px 3px rgba(0,0,0,0.04)' : 'none',
-                  }}
-                >
-                  <div style={{ fontSize: '13px', fontWeight: activeConvId === c.id ? 800 : 600, color: activeConvId === c.id ? '#3A74C2' : '#1D2B42', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.title}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.preview}
-                  </div>
+              {isLoadingConvs ? (
+                <div style={{ padding: '16px', fontSize: '12px', color: '#94A3B8', textAlign: 'center' }}>
+                  Loading sessions...
                 </div>
-              ))}
+              ) : conversations.length === 0 ? (
+                <div style={{ padding: '16px', fontSize: '12px', color: '#94A3B8', textAlign: 'center' }}>
+                  No saved sessions. Start a query below.
+                </div>
+              ) : (
+                conversations.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => handleSelectConversation(c.id)}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: activeConvId === c.id ? '#FFFFFF' : 'transparent',
+                      border: activeConvId === c.id ? '1px solid #D6E4F8' : '1px solid transparent',
+                      cursor: 'pointer',
+                      boxShadow: activeConvId === c.id ? '0 1px 3px rgba(0,0,0,0.04)' : 'none',
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: activeConvId === c.id ? 800 : 600, color: activeConvId === c.id ? '#3A74C2' : '#1D2B42', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {c.title}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {c.preview}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </aside>
         )}
@@ -370,6 +402,41 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
                 </div>
               );
             })}
+
+            {/* Error banner if backend chat call failed */}
+            {chatError && (
+              <div
+                style={{
+                  padding: '12px 18px',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '12px',
+                  fontSize: '13px',
+                  color: '#991B1B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                }}
+              >
+                <span>{chatError}</span>
+                <button
+                  onClick={() => handleSendMessage()}
+                  style={{
+                    backgroundColor: '#DC2626',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
             {/* Loading typing bubble */}
             {isTyping && (

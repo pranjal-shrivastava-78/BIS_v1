@@ -16,6 +16,7 @@ import { NavRoute, QcoRecord } from '../types';
 import { qcoService } from '../services/qcoService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
+import { ErrorState } from '../components/common/ErrorState';
 import { Modal } from '../components/common/Modal';
 
 interface QcoRegulationsPageProps {
@@ -32,38 +33,47 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
 
   const [qcoRecords, setQcoRecords] = useState<QcoRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [selectedQco, setSelectedQco] = useState<QcoRecord | null>(null);
 
   const ministries = [
     'ALL',
-    'Ministry of Commerce and Industry (DPIIT)',
-    'Ministry of Consumer Affairs, Food & Public Distribution',
-    'Ministry of Electronics and Information Technology (MeitY)',
+    'Ministry of Commerce and Industry',
+    'Ministry of Consumer Affairs',
+    'Ministry of Electronics and Information Technology',
     'Ministry of Steel',
   ];
 
   const standardsFilterList = [
     'ALL',
-    'IS 17526',
-    'IS 9873',
+    'IS 17803',
     'IS 1417',
     'IS 1293',
     'IS 16046',
-    'IS 269',
-    'IS 15885',
-    'IS 15844',
+    'IS 13252',
   ];
 
   const fetchQco = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const data = await qcoService.getQcoRecords({
+      const res = await qcoService.getPaginatedQcoRecords({
         query: searchQuery,
-        ministry: selectedMinistry,
-        status: selectedStatus,
-        standard: selectedStandard,
+        ministry: selectedMinistry !== 'ALL' ? selectedMinistry : undefined,
+        status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+        standard: selectedStandard !== 'ALL' ? selectedStandard : undefined,
+        page: currentPage,
+        pageSize: 20,
       });
-      setQcoRecords(data);
+      setQcoRecords(res.items);
+      setTotalPages(res.totalPages);
+      setTotalItems(res.totalItems);
+    } catch (err: any) {
+      setError(err?.message || 'Unable to connect to BIS Parakh QCO service.');
+      setQcoRecords([]);
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +81,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
 
   useEffect(() => {
     fetchQco();
-  }, [searchQuery, selectedMinistry, selectedStatus, selectedStandard]);
+  }, [searchQuery, selectedMinistry, selectedStatus, selectedStandard, currentPage]);
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -237,8 +247,15 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
       </div>
 
       {/* Results Cards List */}
-      {isLoading ? (
-        <LoadingSkeleton type="card" count={3} message="Loading Quality Control Orders..." />
+      {error ? (
+        <ErrorState
+          title="Unable to Load Quality Control Orders"
+          message={error}
+          apiEndpoint="/api/v1/qco"
+          onRetry={fetchQco}
+        />
+      ) : isLoading ? (
+        <LoadingSkeleton type="card" count={3} message="Connecting to BIS QCO regulatory repository..." />
       ) : qcoRecords.length === 0 ? (
         <EmptyState
           icon={Scale}
@@ -250,98 +267,141 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
             setSelectedMinistry('ALL');
             setSelectedStatus('ALL');
             setSelectedStandard('ALL');
+            setCurrentPage(1);
           }}
         />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
-          {qcoRecords.map((q) => (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+            {qcoRecords.map((q) => (
+              <div
+                key={q.id}
+                className="card"
+                style={{
+                  padding: '22px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #D6E4F8',
+                  borderRadius: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                  boxShadow: '0 2px 8px rgba(30, 41, 59, 0.04)',
+                }}
+              >
+                <div>
+                  {/* Status & Standard Badge */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                    <span
+                      style={{
+                        padding: '3px 10px',
+                        borderRadius: '14px',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        backgroundColor: q.status === 'ENFORCED' ? '#DCFCE7' : '#FEF3C7',
+                        color: q.status === 'ENFORCED' ? '#166534' : '#92400E',
+                        border: '1px solid currentColor',
+                      }}
+                    >
+                      {q.status}
+                    </span>
+
+                    <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#3A74C2' }}>
+                      {q.isNumber}
+                    </span>
+                  </div>
+
+                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', lineHeight: 1.35, marginBottom: '6px' }}>
+                    {q.qcoTitle || q.product}
+                  </h3>
+
+                  <div style={{ fontSize: '11.5px', color: '#64748B', marginBottom: '10px' }}>
+                    Ministry: <strong style={{ color: '#39527B' }}>{q.ministry}</strong>
+                  </div>
+
+                  {q.applicableProducts && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
+                      {q.applicableProducts.slice(0, 2).map((p, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            fontSize: '11px',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: '#F1F6FD',
+                            color: '#2A3C5B',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {p}
+                        </span>
+                      ))}
+                      {q.applicableProducts.length > 2 && (
+                        <span style={{ fontSize: '11px', color: '#64748B', alignSelf: 'center' }}>
+                          +{q.applicableProducts.length - 2} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bottom Card Meta */}
+                <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11.5px', color: '#475569' }}>
+                    Effective: <strong>{q.effectiveDate || 'Not available'}</strong>
+                  </span>
+                  <button
+                    onClick={() => setSelectedQco(q)}
+                    className="btn btn-primary btn-sm"
+                    style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '6px' }}
+                  >
+                    View QCO Details &rarr;
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {totalPages > 1 && (
             <div
-              key={q.id}
-              className="card"
               style={{
-                padding: '22px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #D6E4F8',
-                borderRadius: '16px',
                 display: 'flex',
-                flexDirection: 'column',
                 justifyContent: 'space-between',
-                gap: '14px',
-                boxShadow: '0 2px 8px rgba(30, 41, 59, 0.04)',
+                alignItems: 'center',
+                marginTop: '8px',
+                padding: '12px 18px',
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #D6E4F8',
+                flexWrap: 'wrap',
+                gap: '12px',
               }}
             >
-              <div>
-                {/* Status & Standard Badge */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-                  <span
-                    style={{
-                      padding: '3px 10px',
-                      borderRadius: '14px',
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      backgroundColor: q.status === 'ENFORCED' ? '#DCFCE7' : '#FEF3C7',
-                      color: q.status === 'ENFORCED' ? '#166534' : '#92400E',
-                      border: '1px solid currentColor',
-                    }}
-                  >
-                    {q.status}
-                  </span>
-
-                  <span style={{ fontSize: '12.5px', fontWeight: 800, color: '#3A74C2' }}>
-                    {q.isNumber}
-                  </span>
-                </div>
-
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', lineHeight: 1.35, marginBottom: '6px' }}>
-                  {q.qcoTitle || q.product}
-                </h3>
-
-                <div style={{ fontSize: '11.5px', color: '#64748B', marginBottom: '10px' }}>
-                  Ministry: <strong style={{ color: '#39527B' }}>{q.ministry}</strong>
-                </div>
-
-                {q.applicableProducts && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '10px' }}>
-                    {q.applicableProducts.slice(0, 2).map((p, idx) => (
-                      <span
-                        key={idx}
-                        style={{
-                          fontSize: '11px',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: '#F1F6FD',
-                          color: '#2A3C5B',
-                          fontWeight: 500,
-                        }}
-                      >
-                        {p}
-                      </span>
-                    ))}
-                    {q.applicableProducts.length > 2 && (
-                      <span style={{ fontSize: '11px', color: '#64748B', alignSelf: 'center' }}>
-                        +{q.applicableProducts.length - 2} more
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Card Meta */}
-              <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11.5px', color: '#475569' }}>
-                  Effective: <strong>{q.effectiveDate}</strong>
-                </span>
+              <span style={{ fontSize: '13px', color: '#64748B' }}>
+                Showing page <strong style={{ color: '#1D2B42' }}>{currentPage}</strong> of{' '}
+                <strong style={{ color: '#1D2B42' }}>{totalPages}</strong> ({totalItems} orders)
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={() => setSelectedQco(q)}
-                  className="btn btn-primary btn-sm"
-                  style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '6px' }}
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '12px', opacity: currentPage <= 1 ? 0.5 : 1 }}
                 >
-                  View QCO Details &rarr;
+                  &larr; Previous
+                </button>
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '12px', opacity: currentPage >= totalPages ? 0.5 : 1 }}
+                >
+                  Next &rarr;
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* ==================================================
@@ -369,7 +429,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
                 STATUS: {selectedQco.status}
               </span>
               <span style={{ fontSize: '12px', color: '#64748B' }}>
-                Gazette Notification: <strong>{selectedQco.notificationNo}</strong>
+                Gazette Notification: <strong>{selectedQco.notificationNo || 'Not available'}</strong>
               </span>
             </div>
 
@@ -439,7 +499,7 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
             </div>
 
             {/* Compliance Requirements */}
-            {selectedQco.complianceRequirements && (
+            {selectedQco.complianceRequirements && selectedQco.complianceRequirements.length > 0 && (
               <div>
                 <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
                   Mandatory Compliance Requirements
@@ -469,21 +529,21 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
               <div style={{ padding: '10px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
                 <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>NOTIFICATION DATE</div>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginTop: '2px' }}>
-                  {selectedQco.importantDates?.notification || selectedQco.notificationDate}
+                  {selectedQco.notificationDate || selectedQco.importantDates?.notification || 'Not available'}
                 </div>
               </div>
 
               <div style={{ padding: '10px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
                 <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>ENFORCEMENT DATE</div>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: '#166534', marginTop: '2px' }}>
-                  {selectedQco.importantDates?.enforcement || selectedQco.effectiveDate}
+                  {selectedQco.effectiveDate || selectedQco.importantDates?.enforcement || 'Not available'}
                 </div>
               </div>
             </div>
 
             {/* Source Reference */}
             <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '10px', fontSize: '11.5px', color: '#64748B' }}>
-              Official Source: <strong>{selectedQco.sourceReference || selectedQco.sourceGazette}</strong>
+              Official Source: <strong>{selectedQco.sourceGazette || selectedQco.sourceReference || 'Official Gazette Repository'}</strong>
             </div>
           </div>
         </Modal>

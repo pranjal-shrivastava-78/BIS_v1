@@ -24,6 +24,7 @@ import {
 import { adminService, DashboardStats } from '../services/adminService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { SegmentedControl } from '../components/common/SegmentedControl';
+import { ErrorState } from '../components/common/ErrorState';
 
 interface AdminDashboardPageProps {
   initialTab?: 'OVERVIEW' | 'HEALTH' | 'SYNC' | 'ERRORS' | 'REVIEW';
@@ -41,35 +42,44 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   const [syncErrors, setSyncErrors] = useState<SyncErrorRecord[]>([]);
   const [reviewQueue, setReviewQueue] = useState<HumanReviewQueueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [adminError, setAdminError] = useState<string | null>(null);
 
   // Manual Sync UI demo state (Per Section 16)
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadAdminData = () => {
     setIsLoading(true);
+    setAdminError(null);
     Promise.all([
       adminService.getDashboardStats(),
       adminService.getSyncLogs(),
       adminService.getSourceHealth(),
       adminService.getSyncErrors(),
       adminService.getReviewQueue(),
-    ]).then(([s, logs, health, errors, queue]) => {
-      setStats(s);
-      setSyncLogs(logs);
-      setSourceHealth(health);
-      setSyncErrors(errors);
-      setReviewQueue(queue);
-      setIsLoading(false);
-    });
-  }, []);
-
-  const handleResolveReviewItem = async (id: string, action: string) => {
-    await adminService.resolveReviewItem(id, action);
-    setReviewQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: 'RESOLVED' } : item))
-    );
+    ])
+      .then(([s, logs, health, errors, queue]) => {
+        setStats(s);
+        setSyncLogs(logs);
+        setSourceHealth(health);
+        setSyncErrors(errors);
+        setReviewQueue(queue);
+      })
+      .catch((err: any) => {
+        setAdminError(
+          err.status === 401 || err.status === 403
+            ? 'Administrator privileges required. Please sign in with an administrator account to view and trigger ingestion sync feeds.'
+            : err.message || 'Unable to load administrator diagnostics from Parakh backend.'
+        );
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
 
   const handleTriggerManualSync = async () => {
     setIsSyncing(true);
@@ -222,8 +232,17 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
           ================================================== */}
       {activeTab === 'OVERVIEW' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {adminError && (
+            <ErrorState
+              title="Admin Access Required"
+              message={adminError}
+              apiEndpoint="/api/v1/admin"
+              onRetry={loadAdminData}
+            />
+          )}
+
           {isLoading ? (
-            <LoadingSkeleton type="card" count={4} message="Aggregating registry statistics..." />
+            <LoadingSkeleton type="card" count={4} message="Aggregating registry statistics from backend..." />
           ) : (
             <div
               style={{
@@ -233,13 +252,12 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
               }}
             >
               {[
-                { label: 'Total Indian Standards', val: stats?.totalStandards?.toLocaleString() || '21,480', sub: 'IS Catalogue', color: '#3A74C2' },
-                { label: 'Mandatory QCO Orders', val: stats?.totalQcos?.toLocaleString() || '672', sub: 'Gazetted Orders', color: '#DC2626' },
-                { label: 'Certification Schemes', val: stats?.certificationSchemes || '6', sub: 'Active Frameworks', color: '#0369A1' },
-                { label: 'Recognized Laboratories', val: stats?.laboratories?.toLocaleString() || '840', sub: 'LIMS Facilities', color: '#166534' },
-                { label: 'Hallmarking Centres', val: stats?.hallmarkingCentres?.toLocaleString() || '1,520', sub: 'AHC Registry', color: '#B45309' },
-                { label: 'Licensed Jewellers', val: stats?.jewellers?.toLocaleString() || '18,450', sub: 'Registered Jewellers', color: '#7C3AED' },
-                { label: 'Verification Requests', val: stats?.verificationRequests?.toLocaleString() || '142,390', sub: 'HUID & Licence Queries', color: '#0F766E' },
+                { label: 'Total Ingestion Runs', val: stats?.totalSyncRuns?.toLocaleString() || '0', sub: 'Backend Sync Jobs', color: '#3A74C2' },
+                { label: 'Records Processed', val: stats?.totalRecordsProcessed?.toLocaleString() || '0', sub: 'Indexed Entries', color: '#166534' },
+                { label: 'Records Seeded / Created', val: stats?.totalRecordsCreated?.toLocaleString() || '0', sub: 'Stored in Database', color: '#0369A1' },
+                { label: 'Records Updated', val: stats?.totalRecordsUpdated?.toLocaleString() || '0', sub: 'Synchronized Updates', color: '#7C3AED' },
+                { label: 'Active Data Sources', val: `${stats?.activeSourcesCount ?? 0} / ${stats?.totalSourcesCount ?? 0}`, sub: 'Connected Endpoints', color: '#0F766E' },
+                { label: 'Ingestion Status', val: stats?.sourceHealthStatus || 'HEALTHY', sub: `Checked: ${stats?.lastCheckedAt || 'Just now'}`, color: stats?.sourceHealthStatus === 'HEALTHY' ? '#166534' : '#DC2626' },
               ].map((m, idx) => (
                 <div
                   key={idx}
@@ -282,9 +300,8 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 <tr>
                   <th>Source Feed Name</th>
                   <th>Status</th>
-                  <th>Last Sync Time</th>
-                  <th>Records Managed</th>
-                  <th>Health / Latency</th>
+                  <th>Last Checked</th>
+                  <th>Endpoint URL</th>
                 </tr>
               </thead>
               <tbody>
@@ -292,7 +309,6 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   <tr key={idx}>
                     <td>
                       <div style={{ fontWeight: 800, color: '#1D2B42' }}>{sh.name}</div>
-                      <div style={{ fontSize: '11px', color: '#64748B' }}>{sh.endpoint}</div>
                     </td>
                     <td>
                       <span
@@ -308,15 +324,9 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                         {sh.status}
                       </span>
                     </td>
-                    <td style={{ fontSize: '12.5px', color: '#475569' }}>{sh.lastSuccessSync}</td>
-                    <td style={{ fontWeight: 700, color: '#1D2B42' }}>
-                      {sh.records ? sh.records.toLocaleString() : 'N/A'}
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#166534' }}>
-                        {sh.uptimePercentage}% Uptime
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#64748B' }}>{sh.latencyMs}ms response</div>
+                    <td style={{ fontSize: '12.5px', color: '#475569' }}>{sh.lastChecked}</td>
+                    <td style={{ fontSize: '12px', color: '#64748B' }}>
+                      {sh.endpoint}
                     </td>
                   </tr>
                 ))}
@@ -362,11 +372,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                     </td>
                     <td style={{ fontSize: '12px', color: '#475569' }}>{log.lastRun}</td>
                     <td style={{ fontSize: '12px', color: '#475569' }}>{log.completedAt || 'N/A'}</td>
-                    <td style={{ fontWeight: 700 }}>{log.recordsProcessed || 120}</td>
+                    <td style={{ fontWeight: 700 }}>{log.recordsProcessed ?? 'N/A'}</td>
                     <td style={{ color: '#166534', fontWeight: 700 }}>+{log.recordsAdded}</td>
                     <td style={{ color: '#3A74C2', fontWeight: 700 }}>{log.recordsUpdated}</td>
                     <td style={{ color: log.errorsCount ? '#DC2626' : '#64748B', fontWeight: 700 }}>
-                      {log.errorsCount || 0}
+                      {log.errorsCount ?? 0}
                     </td>
                   </tr>
                 ))}
@@ -417,72 +427,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
           TAB 5: REVIEW QUEUE (Per Section 16)
           ================================================== */}
       {activeTab === 'REVIEW' && (
-        <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '16px' }}>
+        <div className="card" style={{ padding: '40px 24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
             Human-in-the-Loop Review Queue
           </h3>
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Item / Issue Description</th>
-                  <th>Dataset</th>
-                  <th>Type & Confidence</th>
-                  <th>Status</th>
-                  <th>Action Buttons</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reviewQueue.map((item) => (
-                  <tr key={item.id}>
-                    <td style={{ maxWidth: '320px' }}>
-                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#1D2B42' }}>
-                        {item.issue}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
-                        Source: {item.source} • Created: {item.created}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge badge-sky">{item.dataset || 'Registry'}</span>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>{item.type}</div>
-                      <div style={{ fontSize: '11px', color: '#166534' }}>{Math.round(item.confidenceScore * 100)}% Confidence</div>
-                    </td>
-                    <td>
-                      <span className={`badge ${item.status === 'RESOLVED' ? 'badge-verified' : 'badge-warning'}`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td>
-                      {item.status !== 'RESOLVED' ? (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleResolveReviewItem(item.id, 'APPROVED')}
-                            className="btn btn-sm btn-primary"
-                            style={{ fontSize: '11px', padding: '3px 8px' }}
-                          >
-                            <Check size={12} /> Approve
-                          </button>
-                          <button
-                            onClick={() => handleResolveReviewItem(item.id, 'DISMISSED')}
-                            className="btn btn-sm btn-secondary"
-                            style={{ fontSize: '11px', padding: '3px 8px' }}
-                          >
-                            <X size={12} /> Dismiss
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '11.5px', color: '#166534', fontWeight: 700 }}>
-                          Resolved ✓
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '520px', margin: '0 auto 16px', lineHeight: 1.5 }}>
+            Review Queue backend integration pending.
+          </p>
+          <div style={{ display: 'inline-flex', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#F1F6FD', color: '#3A74C2', fontSize: '12px', fontWeight: 600 }}>
+            Automated disambiguation and human review queue endpoints are pending in the backend API.
           </div>
         </div>
       )}

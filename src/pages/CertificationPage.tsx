@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Award,
   CheckSquare,
@@ -13,16 +13,32 @@ import {
   Sparkles,
   BookOpen,
   Filter,
+  Search,
+  Scale,
 } from 'lucide-react';
-import { NavRoute, CertificationScheme, ProductCertificationMapping } from '../types';
-import { MOCK_CERTIFICATION_SCHEMES, MOCK_PRODUCT_MAPPINGS } from '../data/certification';
+import { NavRoute, CertificationScheme } from '../types';
 import { SegmentedControl } from '../components/common/SegmentedControl';
+import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { ErrorState } from '../components/common/ErrorState';
+import { certificationApi } from '../api/certification';
+import { CertificationSchemeOut, ProductMappingResponse } from '../types/api';
 
 interface CertificationPageProps {
   initialStandardId?: string;
   initialTab?: 'schemes' | 'mapping' | 'roadmap' | 'checklist' | 'guidance';
   onNavigate: (route: NavRoute, payload?: any) => void;
 }
+
+const mapBackendSchemeToViewModel = (s: CertificationSchemeOut): CertificationScheme => {
+  return {
+    id: s.id || s.scheme_code,
+    name: s.name,
+    code: s.scheme_code,
+    badge: s.scheme_code.replace('_', ' '),
+    description: s.description || '',
+    basicProcedure: s.procedure ? [s.procedure] : undefined,
+  };
+};
 
 export const CertificationPage: React.FC<CertificationPageProps> = ({
   initialTab = 'schemes',
@@ -32,12 +48,55 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
     initialTab === 'checklist' ? 'checklist' : initialTab === 'roadmap' ? 'roadmap' : initialTab === 'mapping' ? 'mapping' : 'schemes'
   );
 
-  // Selected scheme modal/detail
-  const [selectedScheme, setSelectedScheme] = useState<CertificationScheme | null>(MOCK_CERTIFICATION_SCHEMES[0]);
+  // Backend schemes state
+  const [schemes, setSchemes] = useState<CertificationScheme[]>([]);
+  const [isLoadingSchemes, setIsLoadingSchemes] = useState(true);
+  const [schemesError, setSchemesError] = useState<string | null>(null);
+  const [selectedScheme, setSelectedScheme] = useState<CertificationScheme | null>(null);
 
-  // Product mapping state
-  const [selectedMapping, setSelectedMapping] = useState<ProductCertificationMapping>(MOCK_PRODUCT_MAPPINGS[0]);
-  const [mappingSearch, setMappingSearch] = useState('');
+  const fetchSchemes = async () => {
+    setIsLoadingSchemes(true);
+    setSchemesError(null);
+    try {
+      const data = await certificationApi.listSchemes();
+      const mapped = data.map(mapBackendSchemeToViewModel);
+      setSchemes(mapped);
+      if (mapped.length > 0) {
+        setSelectedScheme(mapped[0]);
+      }
+    } catch (err: any) {
+      setSchemesError(err.message || 'Failed to load certification schemes from Parakh backend.');
+      setSchemes([]);
+    } finally {
+      setIsLoadingSchemes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSchemes();
+  }, []);
+
+  // Product mapping state (Direct Parakh Backend Integration)
+  const [mappingQuery, setMappingQuery] = useState('');
+  const [mappingResult, setMappingResult] = useState<ProductMappingResponse | null>(null);
+  const [isMappingLoading, setIsMappingLoading] = useState(false);
+  const [mappingError, setMappingError] = useState<string | null>(null);
+
+  const handleMapProduct = async (queryText?: string) => {
+    const q = (queryText !== undefined ? queryText : mappingQuery).trim();
+    if (!q) return;
+    setIsMappingLoading(true);
+    setMappingError(null);
+    try {
+      const res = await certificationApi.mapProduct(q);
+      setMappingResult(res);
+    } catch (err: any) {
+      setMappingError(err.message || 'Failed to map product to certification standard.');
+      setMappingResult(null);
+    } finally {
+      setIsMappingLoading(false);
+    }
+  };
 
   // Interactive Checklist State
   const [checklist, setChecklist] = useState([
@@ -61,12 +120,6 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
 
   const completedCount = checklist.filter((item) => item.completed).length;
   const progressPercent = Math.round((completedCount / checklist.length) * 100);
-
-  const filteredMappings = MOCK_PRODUCT_MAPPINGS.filter((m) =>
-    m.productName.toLowerCase().includes(mappingSearch.toLowerCase()) ||
-    m.category.toLowerCase().includes(mappingSearch.toLowerCase()) ||
-    m.applicableStandard.toLowerCase().includes(mappingSearch.toLowerCase())
-  );
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -161,29 +214,41 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
       </div>
 
       {/* ==================================================
-          TAB 1: CERTIFICATION SCHEMES (Per Section 6)
+          TAB 1: CERTIFICATION SCHEMES (Connected to Backend)
           ================================================== */}
       {activeTab === 'schemes' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
-            {MOCK_CERTIFICATION_SCHEMES.map((scheme) => (
-              <div
-                key={scheme.id}
-                onClick={() => setSelectedScheme(scheme)}
-                className="card"
-                style={{
-                  padding: '22px',
-                  backgroundColor: '#FFFFFF',
-                  border: selectedScheme?.id === scheme.id ? '2px solid #3A74C2' : '1px solid #D6E4F8',
-                  borderRadius: '16px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  transition: 'all 0.15s ease',
-                }}
-              >
+          {schemesError && (
+            <ErrorState
+              title="Certification Schemes Error"
+              message={schemesError}
+              apiEndpoint="/api/v1/certification/schemes"
+              onRetry={fetchSchemes}
+            />
+          )}
+
+          {isLoadingSchemes ? (
+            <LoadingSkeleton type="card" count={3} message="Loading official BIS certification schemes..." />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
+              {schemes.map((scheme) => (
+                <div
+                  key={scheme.id}
+                  onClick={() => setSelectedScheme(scheme)}
+                  className="card"
+                  style={{
+                    padding: '22px',
+                    backgroundColor: '#FFFFFF',
+                    border: selectedScheme?.id === scheme.id ? '2px solid #3A74C2' : '1px solid #D6E4F8',
+                    borderRadius: '16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span
@@ -213,7 +278,7 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
 
                 <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '11.5px', color: '#3A74C2', fontWeight: 700 }}>
-                    {scheme.applicableProducts.length} Product Categories
+                    {scheme.code}
                   </span>
                   <span style={{ fontSize: '12px', color: '#3A74C2', fontWeight: 700 }}>
                     View Scheme Details &rarr;
@@ -222,6 +287,7 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
               </div>
             ))}
           </div>
+          )}
 
           {/* Scheme Detailed View Box */}
           {selectedScheme && (
@@ -245,75 +311,24 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
                 </p>
               </div>
 
-              {/* 5 Required Details: Eligibility, Applicable Products, Basic Procedure, Required Documents, Important Steps */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
-                {/* Eligibility & Applicable Products */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                    <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-                      Eligibility Criteria
-                    </h4>
-                    <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.5 }}>
-                      {selectedScheme.eligibility}
-                    </p>
-                  </div>
-
-                  <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                    <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-                      Applicable Products Under Scheme
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {selectedScheme.applicableProducts.map((p, idx) => (
-                        <div key={idx} style={{ fontSize: '12.5px', color: '#334155' }}>
-                          • {p}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Required Documents */}
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
-                    Mandatory Required Documents
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {selectedScheme.requiredDocuments.map((doc, idx) => (
-                      <div key={idx} style={{ fontSize: '12.5px', color: '#334155' }}>
-                        <span style={{ color: '#3A74C2', fontWeight: 700 }}>✓</span> {doc}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Basic Procedure & Important Steps */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px', marginTop: '18px' }}>
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
-                    Basic Regulatory Procedure
-                  </h4>
+              {/* Procedure from backend */}
+              <div style={{ padding: '18px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+                  Statutory Procedure (Scheme Regulatory Framework)
+                </h4>
+                {selectedScheme.basicProcedure && selectedScheme.basicProcedure.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {selectedScheme.basicProcedure.map((proc, idx) => (
-                      <div key={idx} style={{ fontSize: '12.5px', color: '#334155' }}>
+                      <div key={idx} style={{ fontSize: '13px', color: '#334155', lineHeight: 1.6 }}>
                         <strong>{idx + 1}.</strong> {proc}
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
-                    Important Implementation Steps
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {selectedScheme.importantSteps.map((step, idx) => (
-                      <div key={idx} style={{ fontSize: '12.5px', color: '#334155' }}>
-                        • {step}
-                      </div>
-                    ))}
+                ) : (
+                  <div style={{ fontSize: '12.5px', color: '#64748B' }}>
+                    Not provided by backend.
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -321,7 +336,7 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
       )}
 
       {/* ==================================================
-          TAB 2: PRODUCT CERTIFICATION MAPPING (Per Section 6)
+          TAB 2: PRODUCT CERTIFICATION MAPPING (Backend-driven)
           ================================================== */}
       {activeTab === 'mapping' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -330,53 +345,97 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
               Product Certification Scheme & Standard Mapping
             </h3>
             <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
-              Select or search a manufactured product to view its designated certification scheme, standard, required documents, and procedure:
+              Enter a product description to query the Parakh backend AI mapping engine and discover its candidate Indian Standard, certification scheme, and QCO status.
             </p>
 
-            {/* Product Search & Select Bar */}
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' }}>
+            {/* Product Input & Submit */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleMapProduct();
+              }}
+              style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}
+            >
               <input
                 type="text"
-                placeholder="Filter products..."
-                value={mappingSearch}
-                onChange={(e) => setMappingSearch(e.target.value)}
+                placeholder="e.g. Stainless steel vacuum insulated water flask with silicone gasket"
+                value={mappingQuery}
+                onChange={(e) => setMappingQuery(e.target.value)}
                 style={{
-                  height: '40px',
+                  flex: 1,
+                  minWidth: '280px',
+                  height: '42px',
                   padding: '0 14px',
-                  fontSize: '13px',
+                  fontSize: '13.5px',
                   borderRadius: '8px',
                   border: '1px solid #D6E4F8',
-                  width: '280px',
                   backgroundColor: '#F8FAFD',
+                  color: '#1D2B42',
                 }}
               />
+              <button
+                type="submit"
+                disabled={isMappingLoading || !mappingQuery.trim()}
+                className="btn btn-primary"
+                style={{ height: '42px', padding: '0 20px', fontSize: '13.5px', fontWeight: 700, borderRadius: '8px' }}
+              >
+                <Search size={15} />
+                {isMappingLoading ? 'Mapping...' : 'Map Product'}
+              </button>
+            </form>
 
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {filteredMappings.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setSelectedMapping(m)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '16px',
-                      fontSize: '12px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      backgroundColor: selectedMapping.id === m.id ? '#3A74C2' : '#F1F6FD',
-                      color: selectedMapping.id === m.id ? '#FFFFFF' : '#39527B',
-                      border: selectedMapping.id === m.id ? '1px solid #2F62A8' : '1px solid #D6E4F8',
-                    }}
-                  >
-                    {m.productName}
-                  </button>
-                ))}
-              </div>
+            {/* Sample Queries */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>Try Example Products:</span>
+              {[
+                'Stainless Steel Vacuum Flask',
+                'Packaged Drinking Water (Bottled)',
+                'Lithium-ion Battery Pack for Smartphone',
+                '22 Karat Gold Jewellery Article',
+                '16A 3-Pin Electrical Plug & Socket',
+              ].map((sample) => (
+                <button
+                  key={sample}
+                  type="button"
+                  onClick={() => {
+                    setMappingQuery(sample);
+                    handleMapProduct(sample);
+                  }}
+                  disabled={isMappingLoading}
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: '#F1F6FD',
+                    border: '1px solid #C4DCFA',
+                    color: '#3A74C2',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {sample}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Mapping Details Result */}
-          {selectedMapping && (
+          {/* Error State */}
+          {mappingError && (
+            <ErrorState
+              title="Product Mapping Failed"
+              message={mappingError}
+              apiEndpoint="/api/v1/certification/map-product"
+              onRetry={() => handleMapProduct()}
+            />
+          )}
+
+          {/* Loading Skeleton */}
+          {isMappingLoading && (
+            <LoadingSkeleton type="card" count={1} message="Querying Parakh neural classifier for candidate standard and scheme..." />
+          )}
+
+          {/* Mapping Details Result: Backend fields ONLY */}
+          {!isMappingLoading && mappingResult && (
             <div
               className="card"
               style={{
@@ -385,68 +444,131 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
                 border: '1.5px solid #3A74C2',
                 borderRadius: '16px',
                 boxShadow: '0 4px 14px rgba(58, 116, 194, 0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '18px',
               }}
             >
-              <div style={{ borderBottom: '1px solid #E2EAF5', paddingBottom: '16px', marginBottom: '20px' }}>
-                <span className="badge badge-sky">{selectedMapping.category}</span>
-                <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#1D2B42', marginTop: '6px' }}>
-                  {selectedMapping.productName}
-                </h2>
+              <div style={{ borderBottom: '1px solid #E2EAF5', paddingBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 900, color: '#3A74C2' }}>
+                      {mappingResult.candidate_standard}
+                    </span>
+                    {mappingResult.is_mandatory ? (
+                      <span className="badge badge-danger">Mandatory QCO Enforced</span>
+                    ) : (
+                      <span className="badge badge-sky">Voluntary / General</span>
+                    )}
+                  </div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
+                    {mappingResult.standard_title}
+                  </h2>
+                </div>
+
+                <span
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    backgroundColor: '#DCFCE7',
+                    color: '#166534',
+                    fontWeight: 800,
+                    fontSize: '12px',
+                    border: '1px solid #86EFAC',
+                  }}
+                >
+                  {Math.round(mappingResult.confidence * 100)}% Confidence
+                </span>
               </div>
 
-              {/* 4 Required Mapping Outputs */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+              {/* Grid of Backend Fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
                 {/* 1. Applicable Certification Scheme */}
                 <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    1. Applicable Certification Scheme
+                    Certification Scheme
                   </div>
                   <div style={{ fontSize: '15px', fontWeight: 800, color: '#3A74C2' }}>
-                    {selectedMapping.applicableScheme}
+                    {mappingResult.certification_scheme || 'Not provided by backend'}
                   </div>
                 </div>
 
-                {/* 2. Applicable Standard */}
+                {/* 2. Applicable QCO */}
                 <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    2. Applicable Standard (IS)
+                    Applicable Quality Control Order (QCO)
                   </div>
-                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginBottom: '2px' }}>
-                    {selectedMapping.applicableStandard}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    {selectedMapping.standardTitle}
-                  </div>
-                </div>
-
-                {/* 3. Required Documents */}
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    3. Required Documents
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {selectedMapping.requiredDocuments.map((doc, idx) => (
-                      <div key={idx} style={{ fontSize: '12px', color: '#334155' }}>
-                        • {doc}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4. Basic Certification Process */}
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    4. Basic Certification Process
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {selectedMapping.basicProcess.map((step, idx) => (
-                      <div key={idx} style={{ fontSize: '12px', color: '#334155' }}>
-                        <strong>{idx + 1}.</strong> {step}
-                      </div>
-                    ))}
+                  <div style={{ fontSize: '14.5px', fontWeight: 700, color: mappingResult.applicable_qco ? '#92400E' : '#64748B' }}>
+                    {mappingResult.applicable_qco || 'None / Not available'}
                   </div>
                 </div>
               </div>
+
+              {/* 3. Reasoning from Backend */}
+              <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Classification Reasoning
+                </div>
+                <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.6 }}>
+                  {mappingResult.reasoning || 'Not provided by backend'}
+                </p>
+              </div>
+
+              <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('/standards', mappingResult.candidate_standard)}
+                  className="btn btn-primary btn-sm"
+                >
+                  Explore Standard Detail &rarr;
+                </button>
+                {mappingResult.applicable_qco && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('/qco-regulations', mappingResult.candidate_standard)}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    View QCO Regulations
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isMappingLoading && !mappingResult && !mappingError && (
+            <div
+              className="card"
+              style={{
+                padding: '48px 24px',
+                backgroundColor: '#FFFFFF',
+                border: '1px dashed #C4DCFA',
+                borderRadius: '16px',
+                textAlign: 'center',
+                color: '#64748B',
+              }}
+            >
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  backgroundColor: '#F1F6FD',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#3A74C2',
+                  margin: '0 auto 12px',
+                }}
+              >
+                <Search size={24} />
+              </div>
+              <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#1D2B42', marginBottom: '6px' }}>
+                No Product Mapping Requested
+              </h4>
+              <p style={{ fontSize: '13px', maxWidth: '480px', margin: '0 auto' }}>
+                Enter a product description above or pick a sample product to query the Parakh backend and determine the applicable Indian Standard and certification scheme.
+              </p>
             </div>
           )}
         </div>
@@ -456,10 +578,16 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
           TAB 3: CERTIFICATION ROADMAP
           ================================================== */}
       {activeTab === 'roadmap' && (
-        <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-            8-Stage BIS Certification Roadmap (Scheme I)
-          </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: '10px 14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12.5px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="badge badge-sky" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Advisory Guide</span>
+            <span>This structured roadmap is an interactive guide for applicant readiness and statutory milestone tracking.</span>
+          </div>
+
+          <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
+              8-Stage BIS Certification Roadmap (Scheme I)
+            </h3>
           <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '24px' }}>
             A structured path from product conception to grant of official CM/L licence.
           </p>
@@ -512,18 +640,25 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
             ))}
           </div>
         </div>
+        </div>
       )}
 
       {/* ==================================================
           TAB 4: COMPLIANCE CHECKLIST
           ================================================== */}
       {activeTab === 'checklist' && (
-        <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-            <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42' }}>
-                Pre-Audit Readiness Checklist
-              </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ padding: '10px 14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12.5px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="badge badge-sky" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Local Checklist</span>
+            <span>Interactive self-audit checklist stored locally in browser session to track pre-audit readiness.</span>
+          </div>
+
+          <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42' }}>
+                  Pre-Audit Readiness Checklist
+                </h3>
               <p style={{ fontSize: '13px', color: '#64748B' }}>
                 Ensure all documentation and technical parameters are completed prior to factory inspection.
               </p>
@@ -580,6 +715,7 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
               </div>
             ))}
           </div>
+        </div>
         </div>
       )}
     </div>

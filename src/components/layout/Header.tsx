@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Bell,
@@ -13,9 +13,12 @@ import {
   Mail,
   Building2,
   FileCheck,
+  LogOut,
 } from 'lucide-react';
 import { NavRoute, Language } from '../../types';
 import { BisLogo } from '../common/BisLogo';
+import { authApi } from '../../api/auth';
+import { UserResponse } from '../../types/api';
 
 interface HeaderProps {
   currentRoute: NavRoute;
@@ -37,6 +40,25 @@ export const Header: React.FC<HeaderProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState<'signin' | 'register' | null>(null);
+
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('bis_auth_token');
+    if (token) {
+      authApi.getMe().then(user => {
+        setCurrentUser(user);
+      }).catch(() => {
+        authApi.logout();
+        setCurrentUser(null);
+      });
+    }
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -388,54 +410,113 @@ export const Header: React.FC<HeaderProps> = ({
             <HelpCircle size={18} />
           </button>
 
-          {/* Sign In Button (white background + blue border) */}
-          <button
-            onClick={() => setShowAuthModal('signin')}
-            style={{
-              backgroundColor: '#FFFFFF',
-              color: '#1D2B42',
-              border: '1.5px solid #3A74C2',
-              borderRadius: '20px',
-              padding: '7px 18px',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#F0F6FE';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#FFFFFF';
-            }}
-          >
-            Sign in
-          </button>
+          {/* Authentication State Button / User Badge */}
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  backgroundColor: '#F1F6FD',
+                  borderRadius: '20px',
+                  border: '1px solid #C4DCFA',
+                  fontSize: '12px',
+                  color: '#1D2B42',
+                  fontWeight: 600,
+                }}
+              >
+                <User size={14} color="#3A74C2" />
+                <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {currentUser.email}
+                </span>
+                <span className="badge badge-sky" style={{ fontSize: '9.5px', textTransform: 'uppercase', padding: '2px 6px' }}>
+                  {currentUser.role}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  authApi.logout();
+                  setCurrentUser(null);
+                }}
+                title="Sign Out"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: '#64748B',
+                  border: '1px solid #D6E4F8',
+                  borderRadius: '20px',
+                  padding: '5px 10px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <LogOut size={13} />
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {/* Sign In Button (white background + blue border) */}
+              <button
+                onClick={() => {
+                  setAuthError(null);
+                  setShowAuthModal('signin');
+                }}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: '#1D2B42',
+                  border: '1.5px solid #3A74C2',
+                  borderRadius: '20px',
+                  padding: '7px 18px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F0F6FE';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Sign in
+              </button>
 
-          {/* Register Button (primary BIS blue) */}
-          <button
-            onClick={() => setShowAuthModal('register')}
-            style={{
-              backgroundColor: '#3A74C2',
-              color: '#FFFFFF',
-              border: '1.5px solid #3A74C2',
-              borderRadius: '20px',
-              padding: '7px 18px',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(58, 116, 194, 0.25)',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#2F62A8';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#3A74C2';
-            }}
-          >
-            Register
-          </button>
+              {/* Register Button (primary BIS blue) */}
+              <button
+                onClick={() => {
+                  setAuthError(null);
+                  setShowAuthModal('register');
+                }}
+                style={{
+                  backgroundColor: '#3A74C2',
+                  color: '#FFFFFF',
+                  border: '1.5px solid #3A74C2',
+                  borderRadius: '20px',
+                  padding: '7px 18px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(58, 116, 194, 0.25)',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2F62A8';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3A74C2';
+                }}
+              >
+                Register
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -579,58 +660,106 @@ export const Header: React.FC<HeaderProps> = ({
                   {showAuthModal === 'signin' ? 'Sign In to BIS Parakh' : 'Register for BIS Parakh'}
                 </h3>
               </div>
-              <button onClick={() => setShowAuthModal(null)} style={{ color: '#64748B' }}>
+              <button onClick={() => setShowAuthModal(null)} style={{ color: '#64748B', background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
             <div style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
-              Access certified standards, licence application tracking, and automated laboratory testing workflows via official e-BIS single sign-on.
+              {showAuthModal === 'signin'
+                ? 'Sign in to access administrator features, live feed sync, and verified standard tracking.'
+                : 'Create an account to access regulatory feeds and verified BIS portals.'}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {authError && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  color: '#991B1B',
+                  marginBottom: '14px',
+                }}
+              >
+                {authError}
+              </div>
+            )}
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setAuthLoading(true);
+                setAuthError(null);
+                try {
+                  if (showAuthModal === 'signin') {
+                    await authApi.login(authEmail, authPassword);
+                  } else {
+                    await authApi.register(authEmail, authPassword, 'user');
+                    await authApi.login(authEmail, authPassword);
+                  }
+                  const user = await authApi.getMe();
+                  setCurrentUser(user);
+                  setShowAuthModal(null);
+                  if (user.role === 'admin') {
+                    onNavigate('/admin');
+                  }
+                } catch (err: any) {
+                  setAuthError(err.message || 'Authentication failed. Please verify credentials.');
+                } finally {
+                  setAuthLoading(false);
+                }
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#1D2B42', display: 'block', marginBottom: '4px' }}>
-                  Email Address or Mobile Number
+                  Email Address
                 </label>
                 <input
-                  type="text"
-                  placeholder="name@enterprise.gov.in"
-                  defaultValue="pranjal.s@enterprise.gov.in"
-                  style={{ width: '100%', height: '40px', padding: '0 12px', fontSize: '13px', borderRadius: '8px' }}
+                  type="email"
+                  required
+                  placeholder="name@example.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  style={{ width: '100%', height: '40px', padding: '0 12px', fontSize: '13px', borderRadius: '8px', border: '1px solid #D6E4F8', backgroundColor: '#F8FAFD' }}
                 />
               </div>
 
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#1D2B42', display: 'block', marginBottom: '4px' }}>
-                  Password or OTP
+                  Password
                 </label>
                 <input
                   type="password"
+                  required
                   placeholder="••••••••••••"
-                  defaultValue="password123"
-                  style={{ width: '100%', height: '40px', padding: '0 12px', fontSize: '13px', borderRadius: '8px' }}
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  style={{ width: '100%', height: '40px', padding: '0 12px', fontSize: '13px', borderRadius: '8px', border: '1px solid #D6E4F8', backgroundColor: '#F8FAFD' }}
                 />
               </div>
 
               <button
-                onClick={() => {
-                  setShowAuthModal(null);
-                  onNavigate('/admin');
-                }}
+                type="submit"
+                disabled={authLoading}
                 className="btn btn-primary"
                 style={{ height: '42px', marginTop: '6px', borderRadius: '8px', fontSize: '14px', fontWeight: 700 }}
               >
-                {showAuthModal === 'signin' ? 'Continue with e-BIS SSO' : 'Create Industry Account'}
+                {authLoading ? 'Authenticating with Parakh Backend...' : showAuthModal === 'signin' ? 'Sign In' : 'Create Account'}
               </button>
-            </div>
+            </form>
 
             <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px', color: '#64748B' }}>
               {showAuthModal === 'signin' ? (
                 <span>
-                  Don't have a verified account?{' '}
+                  Don't have an account?{' '}
                   <span
-                    onClick={() => setShowAuthModal('register')}
+                    onClick={() => {
+                      setAuthError(null);
+                      setShowAuthModal('register');
+                    }}
                     style={{ color: '#3A74C2', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Register here
@@ -640,7 +769,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>
                   Already registered?{' '}
                   <span
-                    onClick={() => setShowAuthModal('signin')}
+                    onClick={() => {
+                      setAuthError(null);
+                      setShowAuthModal('signin');
+                    }}
                     style={{ color: '#3A74C2', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Sign in

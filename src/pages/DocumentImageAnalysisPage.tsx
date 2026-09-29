@@ -18,6 +18,9 @@ import {
 import { NavRoute } from '../types';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { SegmentedControl } from '../components/common/SegmentedControl';
+import { ErrorState } from '../components/common/ErrorState';
+import { jewelleryApi } from '../api/jewellery';
+import { AssayReportData } from '../types/api';
 
 interface DocumentImageAnalysisPageProps {
   initialTab?: 'document' | 'image' | 'label' | 'assay';
@@ -29,154 +32,47 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
   onNavigate,
 }) => {
   const [activeTab, setActiveTab] = useState<'document' | 'image' | 'label' | 'assay'>(initialTab);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
-  // Tool A: Document Analyzer State
-  const [docResult, setDocResult] = useState<{
-    fileName: string;
-    docType: string;
-    extractedInfo: Record<string, string>;
-    importantFields: { field: string; value: string; status: 'VALID' | 'WARNING' }[];
-    detectedStandards: string[];
-    complianceObservations: string[];
-    summary: string;
-  } | null>(null);
+  // Tool D: Assay Report Explainer State (Connected to Parakh FastAPI Backend)
+  const [isProcessingAssay, setIsProcessingAssay] = useState(false);
+  const [assayError, setAssayError] = useState<string | null>(null);
+  const [assayData, setAssayData] = useState<AssayReportData | null>(null);
+  const [assayFileName, setAssayFileName] = useState<string | null>(null);
 
-  // Tool B: Image Analyzer State
-  const [imageResult, setImageResult] = useState<{
-    detectedObjects: string[];
-    classification: string;
-    relevantBisInfo: string;
-    confidence: number;
-    explanation: string;
-  } | null>(null);
+  const assayFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Tool C: BIS Label Scanner State
-  const [labelResult, setLabelResult] = useState<{
-    bisMarkDetected: boolean;
-    cmlNumber: string;
-    standardNumber: string;
-    productInformation: string;
-    detectedText: string;
-    verificationSummary: string;
-    isOperative: boolean;
-  } | null>(null);
-
-  // Tool D: Assay Report Explainer State
-  const [assayResult, setAssayResult] = useState<{
-    reportType: string;
-    metal: string;
-    purity: string;
-    testResults: { parameter: string; foundValue: string; statutoryLimit: string; pass: boolean }[];
-    importantValues: { key: string; val: string }[];
-    explanationSimpleLanguage: string;
-    potentialInconsistencies: string[];
-    summary: string;
-  } | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Simulation handler for Document Analyzer
-  const handleSimulateDocument = (docName: string) => {
-    setIsProcessing(true);
-    setUploadedFileName(docName);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setDocResult({
-        fileName: docName,
-        docType: 'Mill Test Certificate & Factory Quality Control Docket',
-        extractedInfo: {
-          'Manufacturer': 'Apex Metal Containers Pvt. Ltd.',
-          'Material Heat Number': 'HT-2026-SS-0982',
-          'Alloy Chemistry': 'Cr: 18.25%, Ni: 8.35%, C: 0.042%, Mn: 1.65%',
-          'Report Date': '15 September 2026',
-        },
-        importantFields: [
-          { field: 'Material Grade Specification', value: 'SS 304 (04Cr18Ni10) conforming to IS 6911', status: 'VALID' },
-          { field: 'Chemical Ladle Analysis', value: 'Within austenitic SS 304 food-grade envelope', status: 'VALID' },
-          { field: 'Traceability Heat Marking', value: 'Heat number etched on coil batch tag', status: 'VALID' },
-          { field: 'Migration Test Endorsement', value: 'Overall migration test per IS 9845 report reference missing', status: 'WARNING' },
-        ],
-        detectedStandards: ['IS 17526 : 2021', 'IS 6911 : 2017', 'IS 9845'],
-        complianceObservations: [
-          'Raw material grade complies with Clause 4.1 food-grade stainless steel requirement.',
-          'Yield strength (245 MPa) and Tensile strength (580 MPa) comply with IS 6911 coupon criteria.',
-          'Action Required: Append third-party silicone stopper migration test report to finalize docket.',
-        ],
-        summary:
-          'The uploaded document is a valid manufacturer mill test certificate confirming SS 304 austenitic steel quality for insulated water bottles under IS 17526. Technical compliance is 90% complete.',
-      });
-    }, 450);
+  // Real backend handler for Assay Report Explainer (POST /api/v1/jewellery/assay-report)
+  const handleAssayFile = async (file: File) => {
+    setIsProcessingAssay(true);
+    setAssayError(null);
+    setAssayFileName(file.name);
+    try {
+      const result = await jewelleryApi.parseAssayReport(file);
+      setAssayData(result);
+    } catch (err: any) {
+      setAssayError(err.message || 'Failed to analyze assay report with Parakh AI service.');
+      setAssayData(null);
+    } finally {
+      setIsProcessingAssay(false);
+    }
   };
 
-  // Simulation handler for Image Analyzer
-  const handleSimulateImage = (imgName: string) => {
-    setIsProcessing(true);
-    setUploadedFileName(imgName);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setImageResult({
-        detectedObjects: ['Domestic Potable Water Container', 'Double-Walled Stainless Body', 'Polypropylene Stopper', 'Embossed Standard Mark'],
-        classification: 'Insulated Domestic Vacuum Flask (Utensil Category)',
-        relevantBisInfo:
-          'Subject to the mandatory Cookware and Insulated Flasks (Quality Control) Order, 2023 under Indian Standard IS 17526 : 2021. Requires Scheme I ISI mark.',
-        confidence: 94.8,
-        explanation:
-          'Neural vision analysis identified a domestic vacuum container with reflective stainless steel body. The geometry matches insulated drinkware covered under mandatory DPIIT order S.O. 4112(E).',
-      });
-    }, 450);
+  const handleAssayInputFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleAssayFile(file);
+    }
   };
 
-  // Simulation handler for BIS Label Scanner
-  const handleSimulateLabel = (labelName: string) => {
-    setIsProcessing(true);
-    setUploadedFileName(labelName);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setLabelResult({
-        bisMarkDetected: true,
-        cmlNumber: 'CM/L-7200142981',
-        standardNumber: 'IS 17526 : 2021',
-        productInformation: 'Stainless Steel Vacuum Flasks (Milton Pro Series)',
-        detectedText: 'MILTON PRO • IS 17526 • CM/L-7200142981 • CAPACITY: 1000 ML • GRADE SS 304 • MADE IN INDIA',
-        verificationSummary: 'Official ISI mark layout matches BIS graphical standards. Licence CM/L-7200142981 verified as OPERATIVE in e-Manak registry.',
-        isOperative: true,
-      });
-    }, 450);
-  };
-
-  // Simulation handler for Assay Report Explainer
-  const handleSimulateAssay = (reportName: string) => {
-    setIsProcessing(true);
-    setUploadedFileName(reportName);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setAssayResult({
-        reportType: 'Gold Jewellery Assaying Certificate (Fire Assay & XRF Cupellation)',
-        metal: 'Gold (Au)',
-        purity: '22 Karat (916.4 parts per thousand)',
-        testResults: [
-          { parameter: 'Gold Content (Au)', foundValue: '916.4 ‰ (91.64%)', statutoryLimit: '>= 916.0 ‰', pass: true },
-          { parameter: 'Silver (Ag)', foundValue: '48.2 ‰ (4.82%)', statutoryLimit: 'Alloy balance', pass: true },
-          { parameter: 'Copper (Cu)', foundValue: '35.4 ‰ (3.54%)', statutoryLimit: 'Alloy balance', pass: true },
-          { parameter: 'Harmful Elements (Cd, Pb)', foundValue: '< 0.01 ‰ (ND)', statutoryLimit: '<= 0.02 ‰ max', pass: true },
-        ],
-        importantValues: [
-          { key: 'Gross Sample Weight', val: '6.425 grams' },
-          { key: 'Net Pure Gold Mass', val: '5.888 grams' },
-          { key: 'Cupellation Loss', val: '0.04% (within permissible error limit)' },
-          { key: 'AHC Registration', val: 'AHC-DL-0012' },
-        ],
-        explanationSimpleLanguage:
-          'In simple terms: Your gold piece was tested using both laser X-ray and high-temperature fire melting. The results confirm it contains 91.64% pure gold. This slightly exceeds the 91.60% requirement for 22 Karat gold, meaning your gold is genuine and higher than the legal minimum purity.',
-        potentialInconsistencies: [
-          'None: All elemental tests fall within statutory tolerances. Zero negative deviation observed.',
-        ],
-        summary:
-          'Sample AR-2026/4482 conforms fully to 22 Karat (916 fineness) statutory benchmarks specified in IS 1417 : 2016. Suitable for legal 6-digit HUID hallmarking.',
-      });
-    }, 450);
+  const handleTriggerSampleAssay = () => {
+    const sampleBlob = new Blob(
+      [
+        'ASSAY CERTIFICATE\nCentre: AHC-DL-0012 Hallmarking Centre\nReport No: AR-2026/4482\nMetal: Gold (Au)\nReported Purity: 22K (916 Fineness)\nTest Date: 2026-09-20\nSample: 22K Gold Ring with Hallmarking'
+      ],
+      { type: 'text/plain' }
+    );
+    const sampleFile = new File([sampleBlob], 'sample_gold_assay_report.txt', { type: 'text/plain' });
+    handleAssayFile(sampleFile);
   };
 
   return (
@@ -266,10 +162,7 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
               },
             ]}
             activeId={activeTab}
-            onChange={(id) => {
-              setActiveTab(id);
-              setIsProcessing(false);
-            }}
+            onChange={(id) => setActiveTab(id)}
           />
         </div>
       </div>
@@ -279,104 +172,25 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
           ================================================== */}
       {activeTab === 'document' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-              Upload Technical Document or Test Certificate
-            </h3>
-            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
-              Upload a PDF or image of a factory mill certificate, test report, or technical specification sheet to extract compliance fields and detect standards.
-            </p>
-
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => handleSimulateDocument('Sample_Mill_Certificate_SS304.pdf')}
-                className="btn btn-primary"
-                disabled={isProcessing}
-              >
-                <Upload size={15} />
-                Analyze Sample Mill Test Certificate (PDF)
-              </button>
-              <button
-                onClick={() => handleSimulateDocument('Factory_Quality_Manual_Extract.pdf')}
-                className="btn btn-secondary"
-                disabled={isProcessing}
-              >
-                Analyze Factory Quality Manual
-              </button>
-            </div>
+          <div style={{ padding: '12px 16px', backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '13px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="badge badge-warning" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800 }}>Prototype</span>
+            <span>Prototype — backend integration pending</span>
           </div>
 
-          {isProcessing ? (
-            <LoadingSkeleton type="detail" count={1} message="Extracting text, OCR fields, and standard references..." />
-          ) : docResult ? (
-            <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
-              <div style={{ borderBottom: '1px solid #E2EAF5', paddingBottom: '14px', marginBottom: '18px' }}>
-                <span className="badge badge-sky">{docResult.docType}</span>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '6px' }}>
-                  Analysis Report: {docResult.fileName}
-                </h3>
-              </div>
-
-              {/* Extracted & Important Fields */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '18px' }}>
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Extracted Information
-                  </h4>
-                  {Object.entries(docResult.extractedInfo).map(([k, v]) => (
-                    <div key={k} style={{ fontSize: '12.5px', marginBottom: '6px', color: '#1E293B' }}>
-                      <strong style={{ color: '#64748B' }}>{k}:</strong> {v}
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Important Verification Fields
-                  </h4>
-                  {docResult.importantFields.map((f, idx) => (
-                    <div key={idx} style={{ fontSize: '12px', marginBottom: '6px' }}>
-                      <span style={{ color: f.status === 'VALID' ? '#166534' : '#92400E', fontWeight: 700 }}>
-                        {f.status === 'VALID' ? '✓' : '⚠️'}
-                      </span>{' '}
-                      <strong>{f.field}:</strong> <span style={{ color: '#475569' }}>{f.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Detected Standards & Compliance Observations */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '18px' }}>
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Detected Standards
-                  </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {docResult.detectedStandards.map((st, idx) => (
-                      <span key={idx} className="badge badge-sky" style={{ fontSize: '12px' }}>
-                        {st}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Compliance Observations
-                  </h4>
-                  {docResult.complianceObservations.map((obs, idx) => (
-                    <div key={idx} style={{ fontSize: '12px', color: '#334155', marginBottom: '4px' }}>
-                      • {obs}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
-                <strong>Executive Summary:</strong> {docResult.summary}
-              </div>
+          <div className="card" style={{ padding: '36px 24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#F1F6FD', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', color: '#3A74C2' }}>
+              <FileText size={24} />
             </div>
-          ) : null}
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+              Technical Document Analyzer
+            </h3>
+            <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '540px', margin: '0 auto 16px', lineHeight: 1.5 }}>
+              Prototype — backend integration pending. General document OCR and technical certificate parsing endpoints are planned for a subsequent backend release.
+            </p>
+            <div style={{ display: 'inline-flex', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#F8FAFD', border: '1px solid #D6E4F8', color: '#475569', fontSize: '12px' }}>
+              Note: For gold jewellery assay report parsing, please use Tab 4 (Assay Report Explainer), which is integrated live with the Parakh backend.
+            </div>
+          </div>
         </div>
       )}
 
@@ -385,79 +199,25 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
           ================================================== */}
       {activeTab === 'image' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-              Product & Object Image Classifier
-            </h3>
-            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
-              Upload any product photo to classify manufactured goods, detect standards marks, and identify regulatory mandates.
-            </p>
-
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => handleSimulateImage('product_water_flask.jpg')}
-                className="btn btn-primary"
-                disabled={isProcessing}
-              >
-                <Sparkles size={15} />
-                Analyze Sample Vacuum Flask Photo
-              </button>
-              <button
-                onClick={() => handleSimulateImage('electronic_led_driver.jpg')}
-                className="btn btn-secondary"
-                disabled={isProcessing}
-              >
-                Analyze LED Lighting Driver Photo
-              </button>
-            </div>
+          <div style={{ padding: '12px 16px', backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '13px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="badge badge-warning" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800 }}>Prototype</span>
+            <span>Prototype — backend integration pending</span>
           </div>
 
-          {isProcessing ? (
-            <LoadingSkeleton type="detail" count={1} message="Classifying objects and matching regulatory taxonomy..." />
-          ) : imageResult ? (
-            <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #E2EAF5', paddingBottom: '14px' }}>
-                <div>
-                  <span className="badge badge-sky">Image Classification Result</span>
-                  <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
-                    {imageResult.classification}
-                  </h3>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '11px', color: '#64748B' }}>CONFIDENCE</div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#166534' }}>{imageResult.confidence}%</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '18px' }}>
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Detected Objects & Features
-                  </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {imageResult.detectedObjects.map((obj, idx) => (
-                      <span key={idx} style={{ padding: '4px 10px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '6px', fontSize: '12px', color: '#2A3C5B', fontWeight: 600 }}>
-                        • {obj}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
-                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Relevant BIS Information
-                  </h4>
-                  <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.5 }}>
-                    {imageResult.relevantBisInfo}
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
-                <strong>Explanation:</strong> {imageResult.explanation}
-              </div>
+          <div className="card" style={{ padding: '36px 24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#F1F6FD', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', color: '#3A74C2' }}>
+              <ImageIcon size={24} />
             </div>
-          ) : null}
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+              Product & Object Image Classifier
+            </h3>
+            <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '540px', margin: '0 auto 16px', lineHeight: 1.5 }}>
+              Prototype — backend integration pending. General product classification models are not yet deployed in the backend API.
+            </p>
+            <div style={{ display: 'inline-flex', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#F8FAFD', border: '1px solid #D6E4F8', color: '#475569', fontSize: '12px' }}>
+              Note: Gold hallmark optical mark recognition is supported live in Hallmarking & Jewellery &rarr; Optical Hallmark Scanner.
+            </div>
+          </div>
         </div>
       )}
 
@@ -466,181 +226,139 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
           ================================================== */}
       {activeTab === 'label' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
-              Scan / Upload Product Packaging Label
-            </h3>
-            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
-              Scan consumer product packaging or label stickers to detect BIS mark compliance, verify CM/L licence numbers, and extract statutory text.
-            </p>
-
-            <button
-              onClick={() => handleSimulateLabel('Milton_Thermosteel_Packaging_Label.png')}
-              className="btn btn-primary"
-              disabled={isProcessing}
-            >
-              <Scan size={16} />
-              Scan Sample ISI Label (Bottle Base)
-            </button>
+          <div style={{ padding: '12px 16px', backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '13px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="badge badge-warning" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800 }}>Prototype</span>
+            <span>Prototype — backend integration pending</span>
           </div>
 
-          {isProcessing ? (
-            <LoadingSkeleton type="detail" count={1} message="Scanning label geometry, OCR text, and checking licence..." />
-          ) : labelResult ? (
-            <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #E2EAF5', paddingBottom: '14px' }}>
-                <div>
-                  <span className="badge badge-verified">
-                    <CheckCircle2 size={13} /> BIS Mark Detected
-                  </span>
-                  <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
-                    {labelResult.productInformation}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => onNavigate('/verify/licence')}
-                  className="btn btn-sm btn-secondary"
-                >
-                  Verify CM/L in Hub &rarr;
-                </button>
-              </div>
-
-              {/* Required Outputs Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '18px' }}>
-                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
-                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>LICENCE / CM/L NUMBER</div>
-                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#3A74C2', marginTop: '2px' }}>
-                    {labelResult.cmlNumber}
-                  </div>
-                </div>
-
-                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
-                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>INDIAN STANDARD NUMBER</div>
-                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginTop: '2px' }}>
-                    {labelResult.standardNumber}
-                  </div>
-                </div>
-
-                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
-                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>STATUS IN REGISTRY</div>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#166534', marginTop: '2px' }}>
-                    OPERATIVE & VERIFIED
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                  Detected Label Text (OCR Extract)
-                </div>
-                <div style={{ fontSize: '13px', fontFamily: 'monospace', color: '#1D2B42' }}>
-                  {labelResult.detectedText}
-                </div>
-              </div>
-
-              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
-                <strong>Verification Summary:</strong> {labelResult.verificationSummary}
-              </div>
+          <div className="card" style={{ padding: '36px 24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#F1F6FD', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', color: '#3A74C2' }}>
+              <Scan size={24} />
             </div>
-          ) : null}
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+              BIS Packaging Label Scanner
+            </h3>
+            <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '540px', margin: '0 auto 16px', lineHeight: 1.5 }}>
+              Prototype — backend integration pending. Direct optical scanning of packaged ISI labels is pending backend endpoint integration.
+            </p>
+            <div style={{ display: 'inline-flex', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#F8FAFD', border: '1px solid #D6E4F8', color: '#475569', fontSize: '12px' }}>
+              Note: To verify CM/L licence numbers or CRS R-numbers immediately, please use the Verification Hub.
+            </div>
+          </div>
         </div>
       )}
 
       {/* ==================================================
-          TOOL D: ASSAY REPORT EXPLAINER (Per Section 12)
+          TOOL D: ASSAY REPORT EXPLAINER (Connected to Backend)
           ================================================== */}
       {activeTab === 'assay' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <input
+            type="file"
+            ref={assayFileInputRef}
+            onChange={handleAssayInputFileChange}
+            accept=".pdf,.png,.jpg,.jpeg,.txt"
+            style={{ display: 'none' }}
+          />
+
           <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '4px 12px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '20px', fontSize: '12px', color: '#166534', fontWeight: 700 }}>
+              <FlaskConical size={14} /> Backend-Powered Metallurgical Parser (/api/v1/jewellery/assay-report)
+            </div>
             <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
               Assay Report Explainer & Purity Decoder
             </h3>
             <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
-              Upload any laboratory gold assay certificate or cupellation test sheet to translate complex metallurgical values into plain consumer language.
+              Upload any laboratory gold assay certificate, fire assay test sheet, or cupellation report. The backend parser extracts certified parameters, validates legal limits per IS 1417, and produces a plain consumer explanation.
             </p>
 
-            <button
-              onClick={() => handleSimulateAssay('Gold_Fire_Assay_Report_22K.pdf')}
-              className="btn btn-primary"
-              disabled={isProcessing}
-            >
-              <FlaskConical size={16} />
-              Decode Sample Assay Report (22 Karat Ring)
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => assayFileInputRef.current?.click()}
+                className="btn btn-primary"
+                disabled={isProcessingAssay}
+              >
+                <Upload size={16} />
+                Upload Assay Certificate (PDF / Image)
+              </button>
+              <button
+                onClick={handleTriggerSampleAssay}
+                className="btn btn-secondary"
+                disabled={isProcessingAssay}
+              >
+                <FlaskConical size={16} />
+                Load Sample Certificate (22K Gold)
+              </button>
+            </div>
           </div>
 
-          {isProcessing ? (
-            <LoadingSkeleton type="detail" count={1} message="Analyzing assay parameters and synthesizing plain language explanation..." />
-          ) : assayResult ? (
+          {assayError && (
+            <ErrorState
+              title="Assay Report Parsing Error"
+              message={assayError}
+              apiEndpoint="/api/v1/jewellery/assay-report"
+              onRetry={() => assayFileInputRef.current?.click()}
+            />
+          )}
+
+          {isProcessingAssay ? (
+            <LoadingSkeleton type="detail" count={1} message="Sending assay certificate to Parakh AI metallurgical service..." />
+          ) : assayData ? (
             <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #E2EAF5', paddingBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
-                  <span className="badge badge-sky">{assayResult.reportType}</span>
+                  <span className="badge badge-sky">Certificate #{assayData.report_number}</span>
                   <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
-                    Metal: {assayResult.metal} • Purity: <span style={{ color: '#B45309' }}>{assayResult.purity}</span>
+                    Metal: {assayData.metal} • Certified Purity: <span style={{ color: '#B45309' }}>{assayData.reported_purity}</span>
                   </h3>
                 </div>
-                <span className="badge badge-verified">Conforms to IS 1417</span>
+                <span className="badge badge-verified">Conforms to IS 1417 (916 Fineness)</span>
               </div>
 
-              {/* Test Results Table (Per Section 12) */}
-              <div style={{ marginBottom: '18px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
-                  Laboratory Test Results
-                </h4>
-                <div className="table-container">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Tested Parameter</th>
-                        <th>Found Laboratory Value</th>
-                        <th>Statutory Limit (IS 1417)</th>
-                        <th>Result</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {assayResult.testResults.map((t, idx) => (
-                        <tr key={idx}>
-                          <td style={{ fontWeight: 600 }}>{t.parameter}</td>
-                          <td style={{ fontWeight: 800, color: '#1D2B42' }}>{t.foundValue}</td>
-                          <td style={{ fontSize: '12.5px', color: '#64748B' }}>{t.statutoryLimit}</td>
-                          <td>
-                            <span className="badge badge-verified">PASS</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* Parsed Fields Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Testing Centre / Lab</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#1D2B42', marginTop: '3px' }}>
+                    {assayData.centre_name}
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Report Number</div>
+                  <div style={{ fontSize: '15px', fontWeight: 800, color: '#3A74C2', marginTop: '3px' }}>
+                    {assayData.report_number}
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Sample Description</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#1D2B42', marginTop: '3px' }}>
+                    {assayData.sample_description}
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Test Date</div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#166534', marginTop: '3px' }}>
+                    {assayData.test_date}
+                  </div>
                 </div>
               </div>
 
-              {/* Important Values Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '18px' }}>
-                {assayResult.importantValues.map((v, idx) => (
-                  <div key={idx} style={{ padding: '12px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
-                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>{v.key}</div>
-                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#1D2B42', marginTop: '2px' }}>{v.val}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Explanation in Simple Language */}
-              <div style={{ padding: '16px', backgroundColor: '#F0FDF4', borderRadius: '12px', border: '1px solid #BBF7D0', marginBottom: '14px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#166534', marginBottom: '6px' }}>
-                  Explanation in Plain Language
+              {/* Explanation in Plain Language */}
+              <div style={{ padding: '18px', backgroundColor: '#F0FDF4', borderRadius: '12px', border: '1px solid #BBF7D0', marginBottom: '16px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#166534', marginBottom: '6px' }}>
+                  Consumer Explanation (Plain Language)
                 </h4>
                 <p style={{ fontSize: '13.5px', color: '#14532D', lineHeight: 1.6 }}>
-                  {assayResult.explanationSimpleLanguage}
+                  According to official laboratory assay certificate <strong>#{assayData.report_number}</strong> issued by <strong>{assayData.centre_name}</strong> on {assayData.test_date}, the tested sample (<em>{assayData.sample_description}</em>) possesses a verified purity of <strong>{assayData.reported_purity}</strong> in {assayData.metal}. This purity rating conforms with the mandatory purity threshold stipulated under Indian Standard IS 1417 for genuine hallmarked jewellery.
                 </p>
               </div>
 
-              {/* Potential Inconsistencies & Summary */}
-              <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5', fontSize: '12.5px', color: '#475569', marginBottom: '14px' }}>
-                <strong>Potential Inconsistencies:</strong> {assayResult.potentialInconsistencies.join(', ')}
-              </div>
-
-              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
-                <strong>Conclusion Summary:</strong> {assayResult.summary}
+              <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '12px', fontSize: '12px', color: '#64748B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Source: <strong>Parakh Jewellery Backend API</strong></span>
+                <span>File: {assayFileName || 'assay_certificate'}</span>
               </div>
             </div>
           ) : null}
