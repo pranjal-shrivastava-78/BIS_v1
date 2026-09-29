@@ -164,7 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span
                   style={{
                     fontFamily: 'var(--font-heading)',
-                    fontSize: '17px',
+                    fontSize: '18px',
                     fontWeight: 800,
                     color: '#1D2B42',
                     letterSpacing: '-0.02em',
@@ -175,17 +175,17 @@ export const Header: React.FC<HeaderProps> = ({
                 <span
                   style={{
                     fontFamily: 'var(--font-heading)',
-                    fontSize: '17px',
+                    fontSize: '18px',
                     fontWeight: 700,
                     color: '#3A74C2',
                     letterSpacing: '-0.01em',
                   }}
                 >
-                  Intelligent Assistant
+                  Parakh
                 </span>
               </div>
               <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 500, lineHeight: 1.1 }}>
-                Bureau of Indian Standards
+                National Standards Portal
               </span>
             </div>
           </div>
@@ -535,7 +535,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <span>
-                  <strong>Official Hallucination Guard:</strong> The BIS Assistant references gazetted standards and QCOs. Always cross-check formal licence decisions with Manak Online.
+                  <strong>Official Hallucination Guard:</strong> BIS Parakh references gazetted standards and QCOs. Always cross-check formal licence decisions with Manak Online.
                 </span>
               </div>
             </div>
@@ -576,7 +576,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <BisLogo size={32} />
                 <h3 style={{ fontSize: '18px', color: '#1D2B42', fontWeight: 800 }}>
-                  {showAuthModal === 'signin' ? 'Sign In to BIS Portal' : 'Register for BIS Services'}
+                  {showAuthModal === 'signin' ? 'Sign In to BIS Parakh' : 'Register for BIS Parakh'}
                 </h3>
               </div>
               <button onClick={() => setShowAuthModal(null)} style={{ color: '#64748B' }}>

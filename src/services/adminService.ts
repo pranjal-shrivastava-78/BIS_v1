@@ -1,53 +1,62 @@
-import { api } from './apiClient';
-import { AdminSyncRecord, SourceHealthMetric, HumanReviewQueueItem } from '../types';
+import {
+  AdminSyncRecord,
+  SourceHealthMetric,
+  HumanReviewQueueItem,
+  SyncErrorRecord,
+} from '../types';
+import {
+  MOCK_ADMIN_STATS,
+  MOCK_SYNC_RUNS,
+  MOCK_SOURCE_HEALTH,
+  MOCK_REVIEW_QUEUE,
+  MOCK_SYNC_ERRORS,
+  AdminOverviewStats,
+} from '../data/admin';
 
-export interface DashboardStats {
-  totalStandards: number | null;
-  qcoRecords: number | null;
-  laboratories: number | null;
-  ahcCentres: number | null;
-  licensedJewellers: number | null;
-  sourcesActive: number | null;
-  lastSyncTimestamp: string | null;
-}
+export type DashboardStats = AdminOverviewStats;
 
 export const adminService = {
   getDashboardStats: async (): Promise<DashboardStats> => {
-    const res = await api.get<DashboardStats>('/admin/stats');
-    if (res.data) return res.data;
-
-    // Default API-ready state without fabricated numbers
-    return {
-      totalStandards: null,
-      qcoRecords: null,
-      laboratories: null,
-      ahcCentres: null,
-      licensedJewellers: null,
-      sourcesActive: null,
-      lastSyncTimestamp: null,
-    };
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    return { ...MOCK_ADMIN_STATS };
   },
 
   getSyncLogs: async (): Promise<AdminSyncRecord[]> => {
-    const res = await api.get<AdminSyncRecord[]>('/admin/sync-logs');
-    return res.data || [];
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    return [...MOCK_SYNC_RUNS];
   },
 
   getSourceHealth: async (): Promise<SourceHealthMetric[]> => {
-    const res = await api.get<SourceHealthMetric[]>('/admin/source-health');
-    return res.data || [];
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    return [...MOCK_SOURCE_HEALTH];
+  },
+
+  getSyncErrors: async (): Promise<SyncErrorRecord[]> => {
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    return [...MOCK_SYNC_ERRORS];
   },
 
   getReviewQueue: async (): Promise<HumanReviewQueueItem[]> => {
-    const res = await api.get<HumanReviewQueueItem[]>('/admin/review-queue');
-    return res.data || [];
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    return [...MOCK_REVIEW_QUEUE];
   },
 
   resolveReviewItem: async (id: string, action: string) => {
-    return api.post(`/admin/review-queue/${id}/resolve`, { action });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const item = MOCK_REVIEW_QUEUE.find((r) => r.id === id);
+    if (item) {
+      item.status = 'RESOLVED';
+    }
+    return { success: true, id, action };
   },
 
   triggerSync: async () => {
-    return api.post('/admin/sync/trigger');
+    // Pure frontend demo interaction per Section 16: "Sync started" -> loading -> mock success
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    return {
+      success: true,
+      message: 'Automated synchronization completed across 8 data sources.',
+      syncedAt: new Date().toLocaleTimeString(),
+    };
   },
 };

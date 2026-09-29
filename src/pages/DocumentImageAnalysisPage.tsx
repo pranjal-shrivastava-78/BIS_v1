@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   FileSearch,
   Upload,
@@ -9,14 +9,18 @@ import {
   Eye,
   Sparkles,
   ChevronLeft,
-  ExternalLink,
   Camera,
   Image as ImageIcon,
+  Scan,
+  FlaskConical,
+  Scale,
 } from 'lucide-react';
 import { NavRoute } from '../types';
+import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { SegmentedControl } from '../components/common/SegmentedControl';
 
 interface DocumentImageAnalysisPageProps {
-  initialTab?: 'document' | 'image' | 'hallmark' | 'assay' | 'label';
+  initialTab?: 'document' | 'image' | 'label' | 'assay';
   onNavigate: (route: NavRoute, payload?: any) => void;
 }
 
@@ -24,62 +28,155 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
   initialTab = 'document',
   onNavigate,
 }) => {
-  const [activeTab, setActiveTab] = useState<'document' | 'image' | 'hallmark' | 'assay' | 'label'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'document' | 'image' | 'label' | 'assay'>(initialTab);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
-  // Analysis result state
+  // Tool A: Document Analyzer State
   const [docResult, setDocResult] = useState<{
     fileName: string;
     docType: string;
-    identifiedStandard: string;
-    clausesReferenced: string[];
-    complianceStatus: string;
-    findings: string;
+    extractedInfo: Record<string, string>;
+    importantFields: { field: string; value: string; status: 'VALID' | 'WARNING' }[];
+    detectedStandards: string[];
+    complianceObservations: string[];
+    summary: string;
   } | null>(null);
 
-  const [labelResult, setLabelResult] = useState<{
-    detected: {
-      isiLogo: boolean;
-      isStandard: string;
-      cmlNumber: string;
-      brand: string;
-    };
-    verified: {
-      isOperative: boolean;
-      licensee: string;
-      standardTitle: string;
-      status: string;
-    };
-  } | null>({
-    detected: {
-      isiLogo: true,
-      isStandard: 'IS 17526',
-      cmlNumber: 'CM/L-7200142981',
-      brand: 'MILTON PRO',
-    },
-    verified: {
-      isOperative: true,
-      licensee: 'Milton Flasks & Home Appliances Pvt. Ltd.',
-      standardTitle: 'Stainless Steel Vacuum Flasks (IS 17526:2021)',
-      status: 'OPERATIVE & VERIFIED IN BIS REGISTRY',
-    },
-  });
+  // Tool B: Image Analyzer State
+  const [imageResult, setImageResult] = useState<{
+    detectedObjects: string[];
+    classification: string;
+    relevantBisInfo: string;
+    confidence: number;
+    explanation: string;
+  } | null>(null);
 
-  const handleSimulateDocumentUpload = (type: string) => {
+  // Tool C: BIS Label Scanner State
+  const [labelResult, setLabelResult] = useState<{
+    bisMarkDetected: boolean;
+    cmlNumber: string;
+    standardNumber: string;
+    productInformation: string;
+    detectedText: string;
+    verificationSummary: string;
+    isOperative: boolean;
+  } | null>(null);
+
+  // Tool D: Assay Report Explainer State
+  const [assayResult, setAssayResult] = useState<{
+    reportType: string;
+    metal: string;
+    purity: string;
+    testResults: { parameter: string; foundValue: string; statutoryLimit: string; pass: boolean }[];
+    importantValues: { key: string; val: string }[];
+    explanationSimpleLanguage: string;
+    potentialInconsistencies: string[];
+    summary: string;
+  } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Simulation handler for Document Analyzer
+  const handleSimulateDocument = (docName: string) => {
     setIsProcessing(true);
-    setUploadedFileName(`Sample_${type.replace(/\s+/g, '_')}.pdf`);
+    setUploadedFileName(docName);
     setTimeout(() => {
       setIsProcessing(false);
       setDocResult({
-        fileName: `Sample_${type.replace(/\s+/g, '_')}.pdf`,
-        docType: type,
-        identifiedStandard: 'IS 17526 : 2021',
-        clausesReferenced: ['Clause 4.1 Material Specification', 'Clause 5.2 Thermal Retention Test'],
-        complianceStatus: 'PARTIAL COMPLIANCE (1 Test Pending)',
-        findings: 'Material conforms to SS 304 food-grade requirements. Thermal test curve satisfies 6-hour retention requirement above 65°C.',
+        fileName: docName,
+        docType: 'Mill Test Certificate & Factory Quality Control Docket',
+        extractedInfo: {
+          'Manufacturer': 'Apex Metal Containers Pvt. Ltd.',
+          'Material Heat Number': 'HT-2026-SS-0982',
+          'Alloy Chemistry': 'Cr: 18.25%, Ni: 8.35%, C: 0.042%, Mn: 1.65%',
+          'Report Date': '15 September 2026',
+        },
+        importantFields: [
+          { field: 'Material Grade Specification', value: 'SS 304 (04Cr18Ni10) conforming to IS 6911', status: 'VALID' },
+          { field: 'Chemical Ladle Analysis', value: 'Within austenitic SS 304 food-grade envelope', status: 'VALID' },
+          { field: 'Traceability Heat Marking', value: 'Heat number etched on coil batch tag', status: 'VALID' },
+          { field: 'Migration Test Endorsement', value: 'Overall migration test per IS 9845 report reference missing', status: 'WARNING' },
+        ],
+        detectedStandards: ['IS 17526 : 2021', 'IS 6911 : 2017', 'IS 9845'],
+        complianceObservations: [
+          'Raw material grade complies with Clause 4.1 food-grade stainless steel requirement.',
+          'Yield strength (245 MPa) and Tensile strength (580 MPa) comply with IS 6911 coupon criteria.',
+          'Action Required: Append third-party silicone stopper migration test report to finalize docket.',
+        ],
+        summary:
+          'The uploaded document is a valid manufacturer mill test certificate confirming SS 304 austenitic steel quality for insulated water bottles under IS 17526. Technical compliance is 90% complete.',
       });
-    }, 600);
+    }, 450);
+  };
+
+  // Simulation handler for Image Analyzer
+  const handleSimulateImage = (imgName: string) => {
+    setIsProcessing(true);
+    setUploadedFileName(imgName);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setImageResult({
+        detectedObjects: ['Domestic Potable Water Container', 'Double-Walled Stainless Body', 'Polypropylene Stopper', 'Embossed Standard Mark'],
+        classification: 'Insulated Domestic Vacuum Flask (Utensil Category)',
+        relevantBisInfo:
+          'Subject to the mandatory Cookware and Insulated Flasks (Quality Control) Order, 2023 under Indian Standard IS 17526 : 2021. Requires Scheme I ISI mark.',
+        confidence: 94.8,
+        explanation:
+          'Neural vision analysis identified a domestic vacuum container with reflective stainless steel body. The geometry matches insulated drinkware covered under mandatory DPIIT order S.O. 4112(E).',
+      });
+    }, 450);
+  };
+
+  // Simulation handler for BIS Label Scanner
+  const handleSimulateLabel = (labelName: string) => {
+    setIsProcessing(true);
+    setUploadedFileName(labelName);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setLabelResult({
+        bisMarkDetected: true,
+        cmlNumber: 'CM/L-7200142981',
+        standardNumber: 'IS 17526 : 2021',
+        productInformation: 'Stainless Steel Vacuum Flasks (Milton Pro Series)',
+        detectedText: 'MILTON PRO • IS 17526 • CM/L-7200142981 • CAPACITY: 1000 ML • GRADE SS 304 • MADE IN INDIA',
+        verificationSummary: 'Official ISI mark layout matches BIS graphical standards. Licence CM/L-7200142981 verified as OPERATIVE in e-Manak registry.',
+        isOperative: true,
+      });
+    }, 450);
+  };
+
+  // Simulation handler for Assay Report Explainer
+  const handleSimulateAssay = (reportName: string) => {
+    setIsProcessing(true);
+    setUploadedFileName(reportName);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setAssayResult({
+        reportType: 'Gold Jewellery Assaying Certificate (Fire Assay & XRF Cupellation)',
+        metal: 'Gold (Au)',
+        purity: '22 Karat (916.4 parts per thousand)',
+        testResults: [
+          { parameter: 'Gold Content (Au)', foundValue: '916.4 ‰ (91.64%)', statutoryLimit: '>= 916.0 ‰', pass: true },
+          { parameter: 'Silver (Ag)', foundValue: '48.2 ‰ (4.82%)', statutoryLimit: 'Alloy balance', pass: true },
+          { parameter: 'Copper (Cu)', foundValue: '35.4 ‰ (3.54%)', statutoryLimit: 'Alloy balance', pass: true },
+          { parameter: 'Harmful Elements (Cd, Pb)', foundValue: '< 0.01 ‰ (ND)', statutoryLimit: '<= 0.02 ‰ max', pass: true },
+        ],
+        importantValues: [
+          { key: 'Gross Sample Weight', val: '6.425 grams' },
+          { key: 'Net Pure Gold Mass', val: '5.888 grams' },
+          { key: 'Cupellation Loss', val: '0.04% (within permissible error limit)' },
+          { key: 'AHC Registration', val: 'AHC-DL-0012' },
+        ],
+        explanationSimpleLanguage:
+          'In simple terms: Your gold piece was tested using both laser X-ray and high-temperature fire melting. The results confirm it contains 91.64% pure gold. This slightly exceeds the 91.60% requirement for 22 Karat gold, meaning your gold is genuine and higher than the legal minimum purity.',
+        potentialInconsistencies: [
+          'None: All elemental tests fall within statutory tolerances. Zero negative deviation observed.',
+        ],
+        summary:
+          'Sample AR-2026/4482 conforms fully to 22 Karat (916 fineness) statutory benchmarks specified in IS 1417 : 2016. Suitable for legal 6-digit HUID hallmarking.',
+      });
+    }, 450);
   };
 
   return (
@@ -100,13 +197,6 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
           <ChevronLeft size={16} /> Home
         </button>
         <span>/</span>
-        <button
-          onClick={() => onNavigate('/analysis-tools')}
-          style={{ color: '#3A74C2', fontWeight: 600, cursor: 'pointer' }}
-        >
-          Analysis & Consumer Tools
-        </button>
-        <span>/</span>
         <span style={{ color: '#1D2B42', fontWeight: 700 }}>Document & Image Lab</span>
       </div>
 
@@ -120,259 +210,440 @@ export const DocumentImageAnalysisPage: React.FC<DocumentImageAnalysisPageProps>
           borderRadius: '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
           <div
             style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
               backgroundColor: '#EAF2FE',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#3A74C2',
+              border: '1px solid #C4DCFA',
             }}
           >
-            <FileSearch size={22} />
+            <FileSearch size={24} />
           </div>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#1D2B42' }}>
               Document & Image Lab
             </h1>
-            <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-              Upload documents or images for multimodal compliance analysis (product specifications, test reports, hallmarks, or ISI labels).
+            <p style={{ fontSize: '13px', color: '#64748B' }}>
+              Specialized analysis tools for test reports, product imagery, BIS packaging labels, and metallurgical assay reports.
             </p>
           </div>
         </div>
 
-        {/* 5 Sub-Feature Navigation Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '10px',
-            marginTop: '20px',
-            borderTop: '1px solid #E2EAF5',
-            paddingTop: '16px',
-          }}
-        >
-          {[
-            { id: 'document', title: '1. Document Analysis', desc: 'Specs, test reports, compliance docs' },
-            { id: 'image', title: '2. Image Analysis', desc: 'Product labels, marks & identifiers' },
-            { id: 'hallmark', title: '3. Hallmark Scanner', desc: 'Laser HUID & fineness stamps' },
-            { id: 'assay', title: '4. Assay Explainer', desc: 'Deconstruct XRF & assay reports' },
-            { id: 'label', title: '5. BIS Label Scanner', desc: 'ISI mark & CM/L verification' },
-          ].map((sub) => {
-            const isActive = activeTab === sub.id;
-            return (
-              <div
-                key={sub.id}
-                onClick={() => setActiveTab(sub.id as any)}
-                style={{
-                  padding: '10px 12px',
-                  borderRadius: '10px',
-                  backgroundColor: isActive ? '#EAF2FE' : '#FFFFFF',
-                  border: isActive ? '1.5px solid #3A74C2' : '1px solid #D6E4F8',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <div style={{ fontSize: '12.5px', fontWeight: 700, color: isActive ? '#1D2B42' : '#39527B' }}>
-                  {sub.title}
-                </div>
-                <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
-                  {sub.desc}
-                </div>
-              </div>
-            );
-          })}
+        {/* Pill / Segmented Control Bar (Per Section 1 & 2) */}
+        <div style={{ marginTop: '16px', borderTop: '1px solid #E2EAF5', paddingTop: '16px' }}>
+          <SegmentedControl<'document' | 'image' | 'label' | 'assay'>
+            items={[
+              {
+                id: 'document',
+                label: 'Document Analyzer',
+                number: 1,
+                icon: FileText,
+              },
+              {
+                id: 'image',
+                label: 'Image Analyzer',
+                number: 2,
+                icon: ImageIcon,
+              },
+              {
+                id: 'label',
+                label: 'BIS Label Scanner',
+                number: 3,
+                icon: Scan,
+              },
+              {
+                id: 'assay',
+                label: 'Assay Report Explainer',
+                number: 4,
+                icon: FlaskConical,
+              },
+            ]}
+            activeId={activeTab}
+            onChange={(id) => {
+              setActiveTab(id);
+              setIsProcessing(false);
+            }}
+          />
         </div>
       </div>
 
-      {/* Sub-Feature 1: Document Analysis */}
+      {/* ==================================================
+          TOOL A: DOCUMENT ANALYZER (Per Section 11.A)
+          ================================================== */}
       {activeTab === 'document' && (
-        <div
-          className="card"
-          style={{
-            padding: '28px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #D6E4F8',
-            borderRadius: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-          }}
-        >
-          <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '4px' }}>
-              Statutory Document Analysis
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
+              Upload Technical Document or Test Certificate
             </h3>
-            <p style={{ fontSize: '13px', color: '#64748B' }}>
-              Upload your technical documentation to compare clauses and extract conformity parameters.
+            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+              Upload a PDF or image of a factory mill certificate, test report, or technical specification sheet to extract compliance fields and detect standards.
             </p>
-          </div>
 
-          <div
-            style={{
-              border: '2px dashed #C4DCFA',
-              borderRadius: '12px',
-              padding: '32px',
-              textAlign: 'center',
-              backgroundColor: '#F8FAFD',
-            }}
-          >
-            <Upload size={36} color="#3A74C2" style={{ marginBottom: '8px' }} />
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#1D2B42' }}>
-              Drag and drop document or choose sample below
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-              Supports PDF, DOCX, scanned reports up to 25MB.
-            </div>
-
-            <div style={{ marginTop: '16px', display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {[
-                'Product Specification',
-                'Independent Test Report',
-                'Factory Quality Manual',
-                'Assay Report',
-              ].map((docType) => (
-                <button
-                  key={docType}
-                  onClick={() => handleSimulateDocumentUpload(docType)}
-                  className="btn btn-secondary btn-sm"
-                  style={{ borderRadius: '6px' }}
-                >
-                  Analyze Sample {docType}
-                </button>
-              ))}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => handleSimulateDocument('Sample_Mill_Certificate_SS304.pdf')}
+                className="btn btn-primary"
+                disabled={isProcessing}
+              >
+                <Upload size={15} />
+                Analyze Sample Mill Test Certificate (PDF)
+              </button>
+              <button
+                onClick={() => handleSimulateDocument('Factory_Quality_Manual_Extract.pdf')}
+                className="btn btn-secondary"
+                disabled={isProcessing}
+              >
+                Analyze Factory Quality Manual
+              </button>
             </div>
           </div>
 
-          {isProcessing && (
-            <div style={{ padding: '16px', backgroundColor: '#F0F6FE', borderRadius: '10px', textAlign: 'center', color: '#1E40AF', fontSize: '13px' }}>
-              Parsing document structure, extracting clause identifiers, and verifying against BIS standards index...
-            </div>
-          )}
-
-          {docResult && !isProcessing && (
-            <div style={{ padding: '20px', backgroundColor: '#F8FAFD', border: '1px solid #D6E4F8', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <strong style={{ fontSize: '15px', color: '#1D2B42' }}>
+          {isProcessing ? (
+            <LoadingSkeleton type="detail" count={1} message="Extracting text, OCR fields, and standard references..." />
+          ) : docResult ? (
+            <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
+              <div style={{ borderBottom: '1px solid #E2EAF5', paddingBottom: '14px', marginBottom: '18px' }}>
+                <span className="badge badge-sky">{docResult.docType}</span>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '6px' }}>
                   Analysis Report: {docResult.fileName}
-                </strong>
-                <span className="badge badge-warning">{docResult.complianceStatus}</span>
+                </h3>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', fontSize: '13px' }}>
-                <div><strong>Document Type:</strong> {docResult.docType}</div>
-                <div><strong>Mapped Standard:</strong> {docResult.identifiedStandard}</div>
-              </div>
-
-              <div style={{ marginTop: '12px', fontSize: '13px', color: '#334155' }}>
-                <strong>Identified Clauses:</strong>
-                <ul style={{ paddingLeft: '18px', marginTop: '4px' }}>
-                  {docResult.clausesReferenced.map((c, i) => (
-                    <li key={i}>{c}</li>
+              {/* Extracted & Important Fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '18px' }}>
+                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Extracted Information
+                  </h4>
+                  {Object.entries(docResult.extractedInfo).map(([k, v]) => (
+                    <div key={k} style={{ fontSize: '12.5px', marginBottom: '6px', color: '#1E293B' }}>
+                      <strong style={{ color: '#64748B' }}>{k}:</strong> {v}
+                    </div>
                   ))}
-                </ul>
+                </div>
+
+                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Important Verification Fields
+                  </h4>
+                  {docResult.importantFields.map((f, idx) => (
+                    <div key={idx} style={{ fontSize: '12px', marginBottom: '6px' }}>
+                      <span style={{ color: f.status === 'VALID' ? '#166534' : '#92400E', fontWeight: 700 }}>
+                        {f.status === 'VALID' ? '✓' : '⚠️'}
+                      </span>{' '}
+                      <strong>{f.field}:</strong> <span style={{ color: '#475569' }}>{f.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid #E2EAF5', fontSize: '13px', color: '#1E293B' }}>
-                <strong>Technical Summary:</strong> {docResult.findings}
+              {/* Detected Standards & Compliance Observations */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '18px' }}>
+                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Detected Standards
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {docResult.detectedStandards.map((st, idx) => (
+                      <span key={idx} className="badge badge-sky" style={{ fontSize: '12px' }}>
+                        {st}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Compliance Observations
+                  </h4>
+                  {docResult.complianceObservations.map((obs, idx) => (
+                    <div key={idx} style={{ fontSize: '12px', color: '#334155', marginBottom: '4px' }}>
+                      • {obs}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
+                <strong>Executive Summary:</strong> {docResult.summary}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
-      {/* Sub-Feature 2 & 5: Image Analysis & BIS Label Scanner */}
-      {(activeTab === 'image' || activeTab === 'label') && (
-        <div
-          className="card"
-          style={{
-            padding: '28px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #D6E4F8',
-            borderRadius: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-          }}
-        >
-          <div>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '4px' }}>
-              BIS Mark / ISI Label Optical Scanner
+      {/* ==================================================
+          TOOL B: IMAGE ANALYZER (Per Section 11.B)
+          ================================================== */}
+      {activeTab === 'image' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
+              Product & Object Image Classifier
             </h3>
-            <p style={{ fontSize: '13px', color: '#64748B' }}>
-              Examine product packaging to verify standard number, CM/L licence number, and brand consistency against the central registry.
+            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+              Upload any product photo to classify manufactured goods, detect standards marks, and identify regulatory mandates.
             </p>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => handleSimulateImage('product_water_flask.jpg')}
+                className="btn btn-primary"
+                disabled={isProcessing}
+              >
+                <Sparkles size={15} />
+                Analyze Sample Vacuum Flask Photo
+              </button>
+              <button
+                onClick={() => handleSimulateImage('electronic_led_driver.jpg')}
+                className="btn btn-secondary"
+                disabled={isProcessing}
+              >
+                Analyze LED Lighting Driver Photo
+              </button>
+            </div>
           </div>
 
-          <div
-            style={{
-              border: '2px dashed #C4DCFA',
-              borderRadius: '12px',
-              padding: '28px',
-              textAlign: 'center',
-              backgroundColor: '#F8FAFD',
-            }}
-          >
-            <Camera size={36} color="#3A74C2" style={{ marginBottom: '8px' }} />
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#1D2B42' }}>
-              Upload Product Label or Nameplate Photo
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
-              Evaluates ISI mark geometry, font typography, and mandatory standard inscription.
-            </div>
-          </div>
-
-          {labelResult && (
-            <div style={{ padding: '20px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <CheckCircle2 size={20} color="#166534" />
-                <strong style={{ fontSize: '15px', color: '#166534' }}>
-                  {labelResult.verified.status}
-                </strong>
+          {isProcessing ? (
+            <LoadingSkeleton type="detail" count={1} message="Classifying objects and matching regulatory taxonomy..." />
+          ) : imageResult ? (
+            <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #E2EAF5', paddingBottom: '14px' }}>
+                <div>
+                  <span className="badge badge-sky">Image Classification Result</span>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
+                    {imageResult.classification}
+                  </h3>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B' }}>CONFIDENCE</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#166534' }}>{imageResult.confidence}%</div>
+                </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', fontSize: '13px' }}>
-                <div><strong>Standard:</strong> {labelResult.detected.isStandard}</div>
-                <div><strong>CM/L Licence:</strong> {labelResult.detected.cmlNumber}</div>
-                <div><strong>Registered Licensee:</strong> {labelResult.verified.licensee}</div>
-                <div><strong>Scope Title:</strong> {labelResult.verified.standardTitle}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '18px' }}>
+                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Detected Objects & Features
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {imageResult.detectedObjects.map((obj, idx) => (
+                      <span key={idx} style={{ padding: '4px 10px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '6px', fontSize: '12px', color: '#2A3C5B', fontWeight: 600 }}>
+                        • {obj}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
+                  <h4 style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Relevant BIS Information
+                  </h4>
+                  <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.5 }}>
+                    {imageResult.relevantBisInfo}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
+                <strong>Explanation:</strong> {imageResult.explanation}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
-      {/* Sub-Feature 3: Hallmark Scanner & Sub-Feature 4: Assay Explainer */}
-      {(activeTab === 'hallmark' || activeTab === 'assay') && (
-        <div
-          className="card"
-          style={{
-            padding: '28px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #D6E4F8',
-            borderRadius: '16px',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
-              {activeTab === 'hallmark' ? 'Jewellery Hallmark Scanner' : 'Assay Report Explainer'}
+      {/* ==================================================
+          TOOL C: BIS LABEL SCANNER (Per Section 11.C)
+          ================================================== */}
+      {activeTab === 'label' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
+              Scan / Upload Product Packaging Label
             </h3>
-            <p style={{ fontSize: '13.5px', color: '#64748B', marginBottom: '20px' }}>
-              For comprehensive hallmarking tools and AHC directory integration, access the dedicated hallmarking suite.
+            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+              Scan consumer product packaging or label stickers to detect BIS mark compliance, verify CM/L licence numbers, and extract statutory text.
             </p>
+
             <button
-              onClick={() => onNavigate('/hallmarking', { subFeature: activeTab === 'hallmark' ? 'scanner' : 'assay' })}
+              onClick={() => handleSimulateLabel('Milton_Thermosteel_Packaging_Label.png')}
               className="btn btn-primary"
-              style={{ borderRadius: '8px', padding: '10px 24px' }}
+              disabled={isProcessing}
             >
-              Open in Hallmarking Suite &rarr;
+              <Scan size={16} />
+              Scan Sample ISI Label (Bottle Base)
             </button>
           </div>
+
+          {isProcessing ? (
+            <LoadingSkeleton type="detail" count={1} message="Scanning label geometry, OCR text, and checking licence..." />
+          ) : labelResult ? (
+            <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #E2EAF5', paddingBottom: '14px' }}>
+                <div>
+                  <span className="badge badge-verified">
+                    <CheckCircle2 size={13} /> BIS Mark Detected
+                  </span>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
+                    {labelResult.productInformation}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => onNavigate('/verify/licence')}
+                  className="btn btn-sm btn-secondary"
+                >
+                  Verify CM/L in Hub &rarr;
+                </button>
+              </div>
+
+              {/* Required Outputs Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '18px' }}>
+                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>LICENCE / CM/L NUMBER</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#3A74C2', marginTop: '2px' }}>
+                    {labelResult.cmlNumber}
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>INDIAN STANDARD NUMBER</div>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginTop: '2px' }}>
+                    {labelResult.standardNumber}
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>STATUS IN REGISTRY</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#166534', marginTop: '2px' }}>
+                    OPERATIVE & VERIFIED
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5', marginBottom: '14px' }}>
+                <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                  Detected Label Text (OCR Extract)
+                </div>
+                <div style={{ fontSize: '13px', fontFamily: 'monospace', color: '#1D2B42' }}>
+                  {labelResult.detectedText}
+                </div>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
+                <strong>Verification Summary:</strong> {labelResult.verificationSummary}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* ==================================================
+          TOOL D: ASSAY REPORT EXPLAINER (Per Section 12)
+          ================================================== */}
+      {activeTab === 'assay' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px', textAlign: 'center' }}>
+            <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '6px' }}>
+              Assay Report Explainer & Purity Decoder
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '600px', margin: '0 auto 18px', lineHeight: 1.5 }}>
+              Upload any laboratory gold assay certificate or cupellation test sheet to translate complex metallurgical values into plain consumer language.
+            </p>
+
+            <button
+              onClick={() => handleSimulateAssay('Gold_Fire_Assay_Report_22K.pdf')}
+              className="btn btn-primary"
+              disabled={isProcessing}
+            >
+              <FlaskConical size={16} />
+              Decode Sample Assay Report (22 Karat Ring)
+            </button>
+          </div>
+
+          {isProcessing ? (
+            <LoadingSkeleton type="detail" count={1} message="Analyzing assay parameters and synthesizing plain language explanation..." />
+          ) : assayResult ? (
+            <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1.5px solid #3A74C2', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #E2EAF5', paddingBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <span className="badge badge-sky">{assayResult.reportType}</span>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
+                    Metal: {assayResult.metal} • Purity: <span style={{ color: '#B45309' }}>{assayResult.purity}</span>
+                  </h3>
+                </div>
+                <span className="badge badge-verified">Conforms to IS 1417</span>
+              </div>
+
+              {/* Test Results Table (Per Section 12) */}
+              <div style={{ marginBottom: '18px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+                  Laboratory Test Results
+                </h4>
+                <div className="table-container">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Tested Parameter</th>
+                        <th>Found Laboratory Value</th>
+                        <th>Statutory Limit (IS 1417)</th>
+                        <th>Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assayResult.testResults.map((t, idx) => (
+                        <tr key={idx}>
+                          <td style={{ fontWeight: 600 }}>{t.parameter}</td>
+                          <td style={{ fontWeight: 800, color: '#1D2B42' }}>{t.foundValue}</td>
+                          <td style={{ fontSize: '12.5px', color: '#64748B' }}>{t.statutoryLimit}</td>
+                          <td>
+                            <span className="badge badge-verified">PASS</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Important Values Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '18px' }}>
+                {assayResult.importantValues.map((v, idx) => (
+                  <div key={idx} style={{ padding: '12px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>{v.key}</div>
+                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#1D2B42', marginTop: '2px' }}>{v.val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Explanation in Simple Language */}
+              <div style={{ padding: '16px', backgroundColor: '#F0FDF4', borderRadius: '12px', border: '1px solid #BBF7D0', marginBottom: '14px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 800, color: '#166534', marginBottom: '6px' }}>
+                  Explanation in Plain Language
+                </h4>
+                <p style={{ fontSize: '13.5px', color: '#14532D', lineHeight: 1.6 }}>
+                  {assayResult.explanationSimpleLanguage}
+                </p>
+              </div>
+
+              {/* Potential Inconsistencies & Summary */}
+              <div style={{ padding: '14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5', fontSize: '12.5px', color: '#475569', marginBottom: '14px' }}>
+                <strong>Potential Inconsistencies:</strong> {assayResult.potentialInconsistencies.join(', ')}
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1' }}>
+                <strong>Conclusion Summary:</strong> {assayResult.summary}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

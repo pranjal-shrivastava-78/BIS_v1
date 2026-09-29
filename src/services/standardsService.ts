@@ -1,87 +1,119 @@
-import { api } from './apiClient';
 import { IndianStandard, ComplianceGapItem } from '../types';
-import {
-  MINIMAL_STANDARDS_SEED,
-  MINIMAL_COMPLIANCE_GAP_SEED,
-  USE_FALLBACK_SEEDS,
-} from '../data/demo/minimalPlaceholders';
+import { MOCK_STANDARDS } from '../data/standards';
+import { MOCK_COMPLIANCE_PROFILES } from '../data/compliance';
 
 export interface StandardsQueryParams {
   query?: string;
   department?: string;
+  category?: string;
+  year?: string;
+  status?: string;
   qcoOnly?: boolean;
-  page?: number;
-  limit?: number;
 }
 
 export const standardsService = {
   getStandards: async (params?: StandardsQueryParams): Promise<IndianStandard[]> => {
-    const res = await api.get<IndianStandard[]>('/standards', params);
-    if (res.data) return res.data;
+    // Return mock data with simulated asynchronous resolution for realistic UI experience
+    await new Promise((resolve) => setTimeout(resolve, 80));
 
-    // Graceful fallback to minimal seed for frontend preview if backend endpoint is not yet connected
-    if (USE_FALLBACK_SEEDS) {
-      let filtered = [...MINIMAL_STANDARDS_SEED];
-      if (params?.query) {
-        const q = params.query.toLowerCase();
-        filtered = filtered.filter(
-          (s) =>
-            s.isNumber.toLowerCase().includes(q) ||
-            s.title.toLowerCase().includes(q) ||
-            s.scope.toLowerCase().includes(q)
-        );
-      }
-      if (params?.department && params.department !== 'ALL') {
-        filtered = filtered.filter((s) => s.department === params.department);
-      }
-      if (params?.qcoOnly) {
-        filtered = filtered.filter((s) => s.qcoMandatory);
-      }
-      return filtered;
+    let filtered = [...MOCK_STANDARDS];
+
+    if (params?.query) {
+      const q = params.query.toLowerCase().trim();
+      filtered = filtered.filter(
+        (s) =>
+          s.isNumber.toLowerCase().includes(q) ||
+          s.title.toLowerCase().includes(q) ||
+          s.scope.toLowerCase().includes(q) ||
+          s.category.toLowerCase().includes(q) ||
+          (s.applicableProducts && s.applicableProducts.some((p) => p.toLowerCase().includes(q)))
+      );
     }
 
-    return [];
+    if (params?.department && params.department !== 'ALL') {
+      filtered = filtered.filter((s) => s.department === params.department);
+    }
+
+    if (params?.category && params.category !== 'ALL') {
+      filtered = filtered.filter((s) => s.category === params.category);
+    }
+
+    if (params?.year && params.year !== 'ALL') {
+      filtered = filtered.filter((s) => s.year === params.year);
+    }
+
+    if (params?.status && params.status !== 'ALL') {
+      filtered = filtered.filter((s) => s.status === params.status);
+    }
+
+    if (params?.qcoOnly) {
+      filtered = filtered.filter((s) => s.qcoMandatory);
+    }
+
+    return filtered;
   },
 
   getStandardById: async (id: string): Promise<IndianStandard | null> => {
-    const res = await api.get<IndianStandard>(`/standards/${id}`);
-    if (res.data) return res.data;
-
-    if (USE_FALLBACK_SEEDS) {
-      const found = MINIMAL_STANDARDS_SEED.find((s) => s.id === id || s.isNumber.includes(id));
-      return found || null;
-    }
-    return null;
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const found = MOCK_STANDARDS.find(
+      (s) => s.id === id || s.isNumber.toLowerCase().includes(id.toLowerCase())
+    );
+    return found || MOCK_STANDARDS[0];
   },
 
-  matchProductToStandards: async (description: string, attributes?: Record<string, string>) => {
-    const res = await api.post<any>('/standards/match-product', { description, attributes });
-    if (res.data) return res.data;
+  matchProductToStandards: async (description: string, category?: string, keywords?: string) => {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const fullSearch = `${description} ${category || ''} ${keywords || ''}`.toLowerCase();
 
-    // Minimal placeholder match response for UI preview
-    if (USE_FALLBACK_SEEDS) {
-      return [
-        {
-          isNumber: 'IS 17526 : 2021',
-          title: 'Stainless Steel Vacuum Flasks / Insulated Domestic Water Bottles',
-          confidence: 94,
-          matchReason: 'Potentially applicable based on extracted product attributes for insulated domestic containers.',
-          evidenceClause: 'Clause 4.1 & Clause 5.2',
-          qcoMandatory: true,
-          sourceUrl: 'https://www.services.bis.gov.in',
-        },
-      ];
+    // Match against standards catalog
+    const matches = MOCK_STANDARDS.filter((s) => {
+      const standardText = `${s.title} ${s.scope} ${s.category} ${(s.applicableProducts || []).join(' ')}`.toLowerCase();
+      const words = fullSearch.split(/\s+/).filter((w) => w.length > 2);
+      return words.some((w) => standardText.includes(w));
+    });
+
+    if (matches.length > 0) {
+      return matches.map((s) => ({
+        id: s.id,
+        isNumber: s.isNumber,
+        title: s.title,
+        year: s.year,
+        relevance: 95,
+        explanation: `Applicable standard identified based on matching product category "${s.category}" and technical product attributes.`,
+        applicableQco: s.qcoInfo?.orderTitle || 'Subject to General Indian Standards Regulation',
+        qcoMandatory: s.qcoMandatory,
+        certificationRequirement: s.certificationScheme,
+        relatedStandards: s.relatedStandards,
+        sourceUrl: s.bisSourceUrl,
+      }));
     }
-    return [];
+
+    // Default intelligent match fallback
+    return [
+      {
+        id: MOCK_STANDARDS[0].id,
+        isNumber: MOCK_STANDARDS[0].isNumber,
+        title: MOCK_STANDARDS[0].title,
+        year: MOCK_STANDARDS[0].year,
+        relevance: 92,
+        explanation: 'Potentially applicable based on extracted product attributes for insulated domestic containers.',
+        applicableQco: MOCK_STANDARDS[0].qcoInfo?.orderTitle || 'Mandatory DPIIT QCO',
+        qcoMandatory: true,
+        certificationRequirement: MOCK_STANDARDS[0].certificationScheme,
+        relatedStandards: MOCK_STANDARDS[0].relatedStandards,
+        sourceUrl: MOCK_STANDARDS[0].bisSourceUrl,
+      },
+    ];
   },
 
   getComplianceGapItems: async (standardId?: string): Promise<ComplianceGapItem[]> => {
-    const res = await api.get<ComplianceGapItem[]>('/compliance/gap-analysis', { standardId });
-    if (res.data) return res.data;
-
-    if (USE_FALLBACK_SEEDS) {
-      return MINIMAL_COMPLIANCE_GAP_SEED;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    if (standardId) {
+      const profile = MOCK_COMPLIANCE_PROFILES.find(
+        (p) => p.standardId === standardId || p.standardNumber.includes(standardId)
+      );
+      if (profile) return profile.items;
     }
-    return [];
+    return MOCK_COMPLIANCE_PROFILES[0].items;
   },
 };

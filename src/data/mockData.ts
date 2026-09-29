@@ -1,5 +1,10 @@
-/**
- * DEPRECATED: All data fetching has been migrated to the clean service layer in `src/services/`.
- * Minimal demonstration seeds are isolated in `src/data/demo/minimalPlaceholders.ts`.
- */
-export * from './demo/minimalPlaceholders';
+export * from './standards';
+export * from './qco';
+export * from './certification';
+export * from './laboratories';
+export * from './jewellers';
+export * from './hallmarking';
+export * from './verification';
+export * from './compliance';
+export * from './admin';
+export * from './assistant';

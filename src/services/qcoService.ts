@@ -1,37 +1,50 @@
-import { api } from './apiClient';
 import { QcoRecord } from '../types';
-import { MINIMAL_QCO_SEED, USE_FALLBACK_SEEDS } from '../data/demo/minimalPlaceholders';
+import { MOCK_QCOS } from '../data/qco';
 
 export interface QcoQueryParams {
   query?: string;
   ministry?: string;
   status?: string;
+  standard?: string;
 }
 
 export const qcoService = {
   getQcoRecords: async (params?: QcoQueryParams): Promise<QcoRecord[]> => {
-    const res = await api.get<QcoRecord[]>('/qco', params);
-    if (res.data) return res.data;
+    await new Promise((resolve) => setTimeout(resolve, 80));
 
-    if (USE_FALLBACK_SEEDS) {
-      let filtered = [...MINIMAL_QCO_SEED];
-      if (params?.query) {
-        const q = params.query.toLowerCase();
-        filtered = filtered.filter(
-          (item) =>
-            item.product.toLowerCase().includes(q) ||
-            item.isNumber.toLowerCase().includes(q) ||
-            item.notificationNo.toLowerCase().includes(q)
-        );
-      }
-      if (params?.ministry && params.ministry !== 'ALL') {
-        filtered = filtered.filter((item) => item.ministry === params.ministry);
-      }
-      if (params?.status && params.status !== 'ALL') {
-        filtered = filtered.filter((item) => item.status === params.status);
-      }
-      return filtered;
+    let filtered = [...MOCK_QCOS];
+
+    if (params?.query) {
+      const q = params.query.toLowerCase().trim();
+      filtered = filtered.filter(
+        (item) =>
+          item.product.toLowerCase().includes(q) ||
+          (item.qcoTitle && item.qcoTitle.toLowerCase().includes(q)) ||
+          item.isNumber.toLowerCase().includes(q) ||
+          item.notificationNo.toLowerCase().includes(q) ||
+          item.ministry.toLowerCase().includes(q) ||
+          (item.applicableProducts && item.applicableProducts.some((p) => p.toLowerCase().includes(q)))
+      );
     }
-    return [];
+
+    if (params?.ministry && params.ministry !== 'ALL') {
+      filtered = filtered.filter((item) => item.ministry === params.ministry);
+    }
+
+    if (params?.status && params.status !== 'ALL') {
+      filtered = filtered.filter((item) => item.status === params.status);
+    }
+
+    if (params?.standard && params.standard !== 'ALL') {
+      const s = params.standard.toLowerCase();
+      filtered = filtered.filter((item) => item.isNumber.toLowerCase().includes(s));
+    }
+
+    return filtered;
+  },
+
+  getQcoById: async (id: string): Promise<QcoRecord | null> => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return MOCK_QCOS.find((q) => q.id === id) || MOCK_QCOS[0];
   },
 };

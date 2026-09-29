@@ -1,3 +1,4 @@
+import React from 'react';
 import { BisLogo } from '../common/BisLogo';
 import {
   LayoutDashboard,
@@ -10,13 +11,18 @@ import {
   Gem,
   Store,
   ShieldCheck,
-  Users,
   FileSearch,
   CheckSquare,
   Server,
-  HelpCircle,
-  Settings,
   PhoneCall,
+  MapPin,
+  Camera,
+  Calculator,
+  FileText,
+  Image as ImageIcon,
+  Scan,
+  Cpu,
+  CheckCircle,
 } from 'lucide-react';
 import { NavRoute } from '../../types';
 
@@ -33,6 +39,12 @@ interface NavItem {
   sublabel: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   badge?: string;
+  matchRoutes?: string[];
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -41,99 +53,202 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   onCloseMobile,
 }) => {
-  const coreServices: NavItem[] = [
+  // Navigation structure organized per Section 4 of specifications
+  const navigationSections: NavSection[] = [
     {
-      id: 'dashboard',
-      label: 'Dashboard',
-      sublabel: 'Overview & Services',
-      icon: LayoutDashboard,
+      title: 'DASHBOARD',
+      items: [
+        {
+          id: '/',
+          label: 'Home',
+          sublabel: 'Overview & Services',
+          icon: LayoutDashboard,
+          matchRoutes: ['/', 'dashboard'],
+        },
+      ],
     },
     {
-      id: 'ai-assistant',
-      label: 'AI Assistant',
-      sublabel: 'Conversational RAG',
-      icon: BotMessageSquare,
-      badge: 'Core',
+      title: 'DISCOVER',
+      items: [
+        {
+          id: '/standards',
+          label: 'Standards Explorer',
+          sublabel: 'IS Catalogue & Clauses',
+          icon: BookOpen,
+          matchRoutes: ['/standards', 'standards', 'standards-explorer', '/standards/search'],
+        },
+        {
+          id: '/qco-regulations',
+          label: 'QCO Explorer',
+          sublabel: 'Mandatory Orders',
+          icon: Scale,
+          badge: 'QCO',
+          matchRoutes: ['/qco-regulations', 'qco-regulations'],
+        },
+        {
+          id: '/product-to-standard',
+          label: 'Product → Standard',
+          sublabel: 'Find Applicable Standards',
+          icon: Split,
+          matchRoutes: ['/product-to-standard', 'product-to-standard'],
+        },
+      ],
     },
     {
-      id: 'standards-explorer',
-      label: 'Standards Explorer',
-      sublabel: 'IS Catalogue & Clauses',
-      icon: BookOpen,
+      title: 'CERTIFICATION',
+      items: [
+        {
+          id: '/certification/schemes',
+          label: 'Certification Schemes',
+          sublabel: 'Schemes & Certification Information',
+          icon: Award,
+          matchRoutes: ['/certification/schemes', '/certification', 'certification'],
+        },
+        {
+          id: '/certification/mapping',
+          label: 'Certification Mapping',
+          sublabel: 'Product → Certification Route',
+          icon: CheckCircle,
+          matchRoutes: ['/certification/mapping', '/certification/roadmap', '/certification/checklist'],
+        },
+      ],
     },
     {
-      id: 'product-to-standard',
-      label: 'Product → Standard',
-      sublabel: 'Attributes & Discovery',
-      icon: Split,
+      title: 'VERIFY',
+      items: [
+        {
+          id: '/verify/huid',
+          label: 'HUID Verification',
+          sublabel: '6-Digit Hallmark Trace',
+          icon: Gem,
+          matchRoutes: ['/verify/huid', '/verify', 'verification-suite', '/verification-suite', 'verify'],
+        },
+        {
+          id: '/verify/licence',
+          label: 'BIS Licence Verification',
+          sublabel: 'CM/L Number Check',
+          icon: ShieldCheck,
+          matchRoutes: ['/verify/licence'],
+        },
+        {
+          id: '/verify/crs',
+          label: 'R-Number Verification',
+          sublabel: 'CRS Electronics Registry',
+          icon: Cpu,
+          matchRoutes: ['/verify/crs'],
+        },
+      ],
     },
     {
-      id: 'certification',
-      label: 'Certification',
-      sublabel: 'Roadmap & Checklist',
-      icon: Award,
+      title: 'HALLMARKING',
+      items: [
+        {
+          id: '/hallmarking/centres',
+          label: 'Hallmarking Centres',
+          sublabel: 'Recognized AHC Finder',
+          icon: MapPin,
+          matchRoutes: ['/hallmarking/centres', '/hallmarking', 'hallmarking', 'hallmarking-jewellery'],
+        },
+        {
+          id: '/hallmarking/scanner',
+          label: 'Hallmark Scanner',
+          sublabel: 'Optical Mark Inspector',
+          icon: Camera,
+          matchRoutes: ['/hallmarking/scanner'],
+        },
+        {
+          id: '/hallmarking/purity',
+          label: 'Purity Calculator',
+          sublabel: 'IS 1417 Karat Gold Math',
+          icon: Calculator,
+          matchRoutes: ['/hallmarking/purity'],
+        },
+      ],
     },
     {
-      id: 'qco-regulations',
-      label: 'QCO & Regulations',
-      sublabel: 'Mandatory Gazette Orders',
-      icon: Scale,
-      badge: 'QCO',
+      title: 'DIRECTORY',
+      items: [
+        {
+          id: '/laboratories',
+          label: 'Testing Laboratories',
+          sublabel: 'Accredited Lab Directory',
+          icon: FlaskConical,
+          matchRoutes: ['/laboratories', 'laboratories', 'testing-laboratories', '/testing-laboratories'],
+        },
+        {
+          id: '/licensed-jewellers',
+          label: 'Licensed Jewellers',
+          sublabel: 'Registered Outlets',
+          icon: Store,
+          matchRoutes: ['/licensed-jewellers', 'licensed-jewellers'],
+        },
+      ],
     },
     {
-      id: 'testing-laboratories',
-      label: 'Testing Laboratories',
-      sublabel: 'BIS Recognized Facilities',
-      icon: FlaskConical,
+      title: 'ANALYZE',
+      items: [
+        {
+          id: '/document-analysis',
+          label: 'Document Analyzer',
+          sublabel: 'PDF & Specification Extraction',
+          icon: FileText,
+          matchRoutes: ['/document-analysis', '/document-image-lab', 'document-image-lab', 'documents-analysis'],
+        },
+        {
+          id: '/image-analysis',
+          label: 'Image Analyzer',
+          sublabel: 'Visual Mark Detection',
+          icon: ImageIcon,
+          matchRoutes: ['/image-analysis'],
+        },
+        {
+          id: '/label-scanner',
+          label: 'BIS Label Scanner',
+          sublabel: 'Packaging Mark Verification',
+          icon: Scan,
+          matchRoutes: ['/label-scanner'],
+        },
+        {
+          id: '/assay-explainer',
+          label: 'Assay Report Explainer',
+          sublabel: 'Plain Language Breakdown',
+          icon: FileSearch,
+          matchRoutes: ['/assay-explainer', '/hallmarking/assay'],
+        },
+        {
+          id: '/compliance-gap',
+          label: 'Compliance Gap Analysis',
+          sublabel: 'Requirements vs Evidence',
+          icon: CheckSquare,
+          matchRoutes: ['/compliance-gap', 'compliance-gap'],
+        },
+      ],
     },
     {
-      id: 'hallmarking-jewellery',
-      label: 'Hallmarking & Jewellery',
-      sublabel: 'HUID, Scanner & AHC',
-      icon: Gem,
+      title: 'AI',
+      items: [
+        {
+          id: '/chat',
+          label: 'AI Assistant',
+          sublabel: 'Conversational Standards RAG',
+          icon: BotMessageSquare,
+          badge: 'AI',
+          matchRoutes: ['/chat', 'chat', 'ai-assistant', '/ai-assistant'],
+        },
+      ],
     },
     {
-      id: 'licensed-jewellers',
-      label: 'Licensed Jewellers',
-      sublabel: 'BIS Published Registry',
-      icon: Store,
-    },
-    {
-      id: 'verification-suite',
-      label: 'Verification Suite',
-      sublabel: 'Licence & CRS R-Number',
-      icon: ShieldCheck,
-    },
-  ];
-
-  const toolsAndAnalysis: NavItem[] = [
-    {
-      id: 'consumer-services',
-      label: 'Consumer Services',
-      sublabel: 'Citizen Guides & FAQs',
-      icon: Users,
-    },
-    {
-      id: 'documents-analysis',
-      label: 'Document & Image Lab',
-      sublabel: 'Assay Report & OCR',
-      icon: FileSearch,
-    },
-    {
-      id: 'compliance-gap',
-      label: 'Compliance Gap Analysis',
-      sublabel: 'Product vs Requirement',
-      icon: CheckSquare,
-    },
-  ];
-
-  const adminSection: NavItem[] = [
-    {
-      id: 'admin-dashboard',
-      label: 'Admin & Telemetry',
-      sublabel: 'Sync, Health & Review',
-      icon: Server,
-      badge: 'Admin',
+      title: 'ADMIN',
+      items: [
+        {
+          id: '/admin',
+          label: 'Admin Dashboard',
+          sublabel: 'Health, Sync & Review',
+          icon: Server,
+          badge: 'Demo',
+          matchRoutes: ['/admin', 'admin', 'admin-dashboard', '/admin/health', '/admin/sync', '/admin/review'],
+        },
+      ],
     },
   ];
 
@@ -142,116 +257,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onCloseMobile();
   };
 
-  const renderNavGroup = (title: string, items: NavItem[]) => (
-    <div style={{ marginBottom: '20px' }}>
-      <div
-        style={{
-          fontSize: '10.5px',
-          fontWeight: 700,
-          letterSpacing: '0.08em',
-          color: '#92BBF8',
-          textTransform: 'uppercase',
-          padding: '0 16px',
-          marginBottom: '8px',
-        }}
-      >
-        {title}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-        {items.map((item) => {
-          const isActive = currentRoute === item.id;
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleItemClick(item.id)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                textAlign: 'left',
-                backgroundColor: isActive ? '#FFFFFF' : 'transparent',
-                color: isActive ? '#2A3C5B' : '#E2EAF5',
-                transition: 'all 0.15s ease',
-                boxShadow: isActive ? '0 2px 8px rgba(0, 0, 0, 0.12)' : 'none',
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                <div
-                  style={{
-                    color: isActive ? '#3A74C2' : '#92BBF8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Icon size={18} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: '13px',
-                      fontWeight: isActive ? 700 : 500,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {item.label}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '10.5px',
-                      color: isActive ? '#64748B' : 'rgba(226, 234, 245, 0.65)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {item.sublabel}
-                  </div>
-                </div>
-              </div>
-
-              {item.badge && (
-                <span
-                  style={{
-                    fontSize: '9.5px',
-                    fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: '10px',
-                    backgroundColor: isActive ? '#3A74C2' : '#2A3C5B',
-                    color: isActive ? '#FFFFFF' : '#92BBF8',
-                    border: '1px solid rgba(146, 187, 248, 0.3)',
-                    marginLeft: '6px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  const isItemActive = (item: NavItem): boolean => {
+    if (currentRoute === item.id) return true;
+    if (item.matchRoutes && item.matchRoutes.includes(String(currentRoute))) {
+      return true;
+    }
+    return false;
+  };
 
   return (
     <>
@@ -286,10 +298,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           top: 0,
         }}
       >
-        {/* Sidebar Header / Brand */}
+        {/* Sidebar Header / Brand - Per Section 9 */}
         <div
           style={{
-            padding: '20px 18px 16px',
+            padding: '18px 18px 14px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             alignItems: 'center',
@@ -297,6 +309,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
         >
           <div
+            onClick={() => handleItemClick('/')}
             style={{
               width: '38px',
               height: '38px',
@@ -308,24 +321,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               flexShrink: 0,
               boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
               overflow: 'hidden',
+              cursor: 'pointer',
             }}
           >
             <BisLogo size={24} />
           </div>
-          <div>
+          <div onClick={() => handleItemClick('/')} style={{ cursor: 'pointer' }}>
             <div
               style={{
                 fontFamily: 'var(--font-heading)',
-                fontSize: '15px',
+                fontSize: '16px',
                 fontWeight: 800,
                 color: '#FFFFFF',
                 letterSpacing: '-0.01em',
               }}
             >
-              BIS Assistant
+              BIS Parakh
             </div>
             <div style={{ fontSize: '11px', color: '#92BBF8', fontWeight: 500 }}>
-              Manak Bhavan • New Delhi
+              National Standards Portal
             </div>
           </div>
         </div>
@@ -335,18 +349,128 @@ export const Sidebar: React.FC<SidebarProps> = ({
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '16px 12px',
+            padding: '14px 10px',
           }}
         >
-          {renderNavGroup('GOVERNMENT SERVICES & STANDARDS', coreServices)}
-          {renderNavGroup('ANALYSIS & CONSUMER TOOLS', toolsAndAnalysis)}
-          {renderNavGroup('ADMINISTRATION & MONITORING', adminSection)}
+          {navigationSections.map((section) => (
+            <div key={section.title} style={{ marginBottom: '16px' }}>
+              <div
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  color: '#92BBF8',
+                  textTransform: 'uppercase',
+                  padding: '0 12px',
+                  marginBottom: '6px',
+                }}
+              >
+                {section.title}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {section.items.map((item) => {
+                  const isActive = isItemActive(item);
+                  const Icon = item.icon;
+
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleItemClick(item.id)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        textAlign: 'left',
+                        backgroundColor: isActive ? '#4A6999' : 'transparent',
+                        color: '#FFFFFF',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isActive ? '0 2px 8px rgba(0, 0, 0, 0.18)' : 'none',
+                        border: isActive ? '1px solid rgba(146, 187, 248, 0.35)' : '1px solid transparent',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <div
+                          style={{
+                            color: isActive ? '#FFFFFF' : '#92BBF8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon size={16} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: '12.5px',
+                              fontWeight: isActive ? 700 : 500,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              color: '#FFFFFF',
+                            }}
+                          >
+                            {item.label}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '10px',
+                              color: isActive ? '#E2EAF5' : 'rgba(226, 234, 245, 0.65)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {item.sublabel}
+                          </div>
+                        </div>
+                      </div>
+
+                      {item.badge && (
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '8px',
+                            backgroundColor: isActive ? '#2A3C5B' : '#2A3C5B',
+                            color: '#92BBF8',
+                            border: '1px solid rgba(146, 187, 248, 0.3)',
+                            marginLeft: '4px',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Sidebar Footer - Matching screenshot's Help/Support block */}
+        {/* Sidebar Footer - Helpline / Official metadata - Per Section 10 */}
         <div
           style={{
-            padding: '14px 16px',
+            padding: '12px 14px',
             borderTop: '1px solid rgba(255, 255, 255, 0.1)',
             backgroundColor: '#2A3C5B',
           }}
@@ -355,14 +479,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              marginBottom: '10px',
+              gap: '8px',
+              marginBottom: '8px',
             }}
           >
             <div
               style={{
-                width: '30px',
-                height: '30px',
+                width: '26px',
+                height: '26px',
                 borderRadius: '50%',
                 backgroundColor: 'rgba(146, 187, 248, 0.15)',
                 color: '#92BBF8',
@@ -371,32 +495,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 justifyContent: 'center',
               }}
             >
-              <PhoneCall size={15} />
+              <PhoneCall size={13} />
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: '#92BBF8', fontWeight: 600 }}>
-                Help & Support
+              <div style={{ fontSize: '10.5px', color: '#92BBF8', fontWeight: 600 }}>
+                National Toll-Free Helpline
               </div>
-              <div style={{ fontSize: '12.5px', color: '#FFFFFF', fontWeight: 700 }}>
+              <div style={{ fontSize: '12px', color: '#FFFFFF', fontWeight: 700 }}>
                 1800-11-8004
               </div>
             </div>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: '11px',
-              color: 'rgba(226, 234, 245, 0.7)',
-              paddingTop: '6px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            }}
-          >
-            <span>Terms & Conditions</span>
-            <span>Privacy Policy</span>
-            <span style={{ color: '#92BBF8', fontWeight: 600 }}>v2.4.0</span>
           </div>
         </div>
       </aside>

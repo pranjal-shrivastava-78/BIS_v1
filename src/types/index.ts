@@ -14,6 +14,8 @@ export type NavRoute =
   | '/product-to-standard'
   | 'certification'
   | '/certification'
+  | '/certification/schemes'
+  | '/certification/mapping'
   | '/certification/roadmap'
   | '/certification/checklist'
   | 'qco-regulations'
@@ -24,13 +26,20 @@ export type NavRoute =
   | 'hallmarking-jewellery'
   | 'hallmarking'
   | '/hallmarking'
-  | '/hallmarking/huid'
+  | '/hallmarking/centres'
   | '/hallmarking/scanner'
   | '/hallmarking/purity'
   | '/hallmarking/assay'
-  | '/hallmarking/jewellers'
+  | '/hallmarking/huid'
   | 'licensed-jewellers'
+  | '/licensed-jewellers'
   | 'verification-suite'
+  | '/verification-suite'
+  | 'verify'
+  | '/verify'
+  | '/verify/huid'
+  | '/verify/licence'
+  | '/verify/crs'
   | 'consumer-services'
   | '/consumer-services'
   | 'documents-analysis'
@@ -38,11 +47,16 @@ export type NavRoute =
   | '/document-image-lab'
   | '/document-analysis'
   | '/image-analysis'
+  | '/label-scanner'
+  | '/assay-explainer'
   | 'compliance-gap'
   | '/compliance-gap'
   | 'admin-dashboard'
   | 'admin'
   | '/admin'
+  | '/admin/health'
+  | '/admin/sync'
+  | '/admin/review'
   | 'government-services'
   | '/government-services'
   | 'analysis-tools'
@@ -90,12 +104,27 @@ export interface IndianStandard {
   qcoMandatory: boolean;
   qcoDate?: string;
   scope: string;
+  description?: string;
+  applicableProducts?: string[];
   clauses: ClauseInfo[];
   amendments: string[];
   certificationScheme: 'Scheme I (ISI Mark)' | 'Scheme II (CRS)' | 'Scheme IV' | 'Voluntary';
   relatedStandards: string[];
   bisSourceUrl: string;
   lastUpdated: string;
+  qcoInfo?: {
+    mandatory: boolean;
+    orderTitle: string;
+    ministry: string;
+    effectiveDate: string;
+    notificationNo: string;
+  };
+  certificationInfo?: {
+    scheme: string;
+    mark: string;
+    procedure: string;
+  };
+  sourceReference?: string;
 }
 
 export interface ProductAttribute {
@@ -116,6 +145,7 @@ export interface TestingLab {
   email: string;
   capabilities: string[];
   accreditedStandards: string[];
+  services?: string[];
   validity: string;
   status: 'RECOGNIZED' | 'AUDIT_PENDING' | 'SUSPENDED';
   officialSource: string;
@@ -130,6 +160,8 @@ export interface HallmarkingCentre {
   state: string;
   city: string;
   address: string;
+  contact?: string;
+  services?: string[];
   metalCapability: 'Gold (Au)' | 'Silver (Ag)' | 'Gold & Silver';
   status: 'OPERATIONAL' | 'RECOGNITION_EXPIRED' | 'AUDIT_IN_PROGRESS';
   validity: string;
@@ -144,6 +176,7 @@ export interface LicensedJeweller {
   address: string;
   city: string;
   state: string;
+  contact?: string;
   metalCategory: 'Gold' | 'Silver' | 'Both';
   status: 'OPERATIVE' | 'SURRENDERED' | 'CANCELLED';
   validTill: string;
@@ -152,6 +185,7 @@ export interface LicensedJeweller {
 
 export interface QcoRecord {
   id: string;
+  qcoTitle?: string;
   product: string;
   isNumber: string;
   ministry: string;
@@ -159,8 +193,41 @@ export interface QcoRecord {
   notificationDate: string;
   effectiveDate: string;
   status: 'ENFORCED' | 'UPCOMING' | 'EXTENDED';
+  applicableProducts?: string[];
+  applicableStandards?: string[];
+  complianceRequirements?: string[];
+  importantDates?: {
+    notification: string;
+    enforcement: string;
+    extension?: string;
+  };
   sourceGazette: string;
+  sourceReference?: string;
   lastSynchronized: string;
+}
+
+export interface CertificationScheme {
+  id: string;
+  name: string;
+  code: string;
+  badge: string;
+  description: string;
+  applicableProducts: string[];
+  eligibility: string;
+  basicProcedure: string[];
+  requiredDocuments: string[];
+  importantSteps: string[];
+}
+
+export interface ProductCertificationMapping {
+  id: string;
+  productName: string;
+  category: string;
+  applicableScheme: string;
+  applicableStandard: string;
+  standardTitle: string;
+  requiredDocuments: string[];
+  basicProcess: string[];
 }
 
 export interface HuidVerificationResult {
@@ -170,11 +237,15 @@ export interface HuidVerificationResult {
   status: 'VERIFIED' | 'INVALID_FORMAT' | 'NOT_FOUND' | 'UNAVAILABLE';
   jewellerRegNo?: string;
   jewellerName?: string;
+  jewellerCity?: string;
   ahcCode?: string;
   ahcName?: string;
   metalFineness?: string; // e.g. "22K (916)"
+  metal?: string; // e.g. "Gold"
+  purityPercent?: string; // e.g. "91.6%"
   hallmarkingDate?: string;
   articleType?: string;
+  articleWeight?: string;
   officialSource: string;
   verifiedAt: string;
   disclaimer: string;
@@ -190,6 +261,7 @@ export interface LicenceVerificationResult {
   brand?: string;
   validTill?: string;
   scheme?: string;
+  certificationDetails?: string;
   officialSource: string;
   verifiedAt: string;
 }
@@ -202,6 +274,7 @@ export interface CrsVerificationResult {
   productCategory?: string;
   isStandard?: string;
   validTill?: string;
+  registrationDetails?: string;
   officialSource: string;
   verifiedAt: string;
 }
@@ -242,6 +315,14 @@ export interface ComplianceGapItem {
   gapStatus: 'COMPLIANT' | 'GAP_FOUND' | 'PARTIAL' | 'UNVERIFIABLE';
   remedialAction: string;
   sourceStandard: string;
+  priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
+export interface ComplianceSummary {
+  overallStatus: 'COMPLIANT' | 'GAP_FOUND' | 'PARTIAL_COMPLIANCE' | 'AUDIT_READY';
+  requirementsMet: number;
+  requirementsPending: number;
+  missingInformation: string[];
 }
 
 export interface AdminSyncRecord {
@@ -254,6 +335,17 @@ export interface AdminSyncRecord {
   status: 'SUCCESS' | 'WARNING' | 'FAILED';
   lastRun: string;
   durationMs: number;
+  completedAt?: string;
+  recordsProcessed?: number;
+  errorsCount?: number;
+}
+
+export interface SyncErrorRecord {
+  id: string;
+  dataset: string;
+  errorType: string;
+  message: string;
+  timestamp: string;
 }
 
 export interface SourceHealthMetric {
@@ -264,6 +356,7 @@ export interface SourceHealthMetric {
   latencyMs: number;
   lastChecked: string;
   lastSuccessSync: string;
+  records?: number;
 }
 
 export interface HumanReviewQueueItem {
@@ -271,6 +364,7 @@ export interface HumanReviewQueueItem {
   issue: string;
   type: 'AMBIGUOUS_MAPPING' | 'CONFLICTING_SOURCE' | 'OCR_FAILURE' | 'REGULATORY_UNCERTAINTY';
   source: string;
+  dataset?: string;
   created: string;
   priority: 'HIGH' | 'MEDIUM' | 'LOW';
   status: 'PENDING' | 'IN_REVIEW' | 'RESOLVED';

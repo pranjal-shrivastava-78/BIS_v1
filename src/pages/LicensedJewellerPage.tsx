@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
   Store,
   Search,
+  MapPin,
+  Phone,
+  CheckCircle2,
+  ChevronLeft,
+  Filter,
 } from 'lucide-react';
 import { NavRoute, LicensedJeweller } from '../types';
 import { jewellersService } from '../services/jewellersService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
-import { ErrorState } from '../components/common/ErrorState';
 
 interface LicensedJewellerPageProps {
   onNavigate: (route: NavRoute, payload?: any) => void;
@@ -18,26 +22,25 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
+  const [selectedCity, setSelectedCity] = useState('');
   const [selectedMetal, setSelectedMetal] = useState('ALL');
+
   const [jewellers, setJewellers] = useState<LicensedJeweller[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const states = ['ALL', 'Delhi', 'Karnataka', 'Telangana', 'Rajasthan', 'Maharashtra'];
+  const states = ['ALL', 'Delhi', 'Karnataka', 'Maharashtra', 'Tamil Nadu', 'Telangana', 'Rajasthan', 'West Bengal'];
   const metals = ['ALL', 'Gold', 'Silver', 'Both'];
 
   const fetchJewellers = async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const data = await jewellersService.getJewellers({
         query: searchQuery,
         state: selectedState,
+        city: selectedCity,
         metal: selectedMetal,
       });
       setJewellers(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch licensed jewellers');
     } finally {
       setIsLoading(false);
     }
@@ -45,41 +48,81 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
 
   useEffect(() => {
     fetchJewellers();
-  }, [searchQuery, selectedState, selectedMetal]);
+  }, [searchQuery, selectedState, selectedCity, selectedMetal]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Breadcrumb Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B' }}>
+        <button
+          onClick={() => onNavigate('/')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: '#3A74C2',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronLeft size={16} /> Home
+        </button>
+        <span>/</span>
+        <span style={{ color: '#1D2B42', fontWeight: 700 }}>Licensed Jewellers</span>
+      </div>
+
       {/* Header */}
       <div
         className="card"
         style={{
           padding: '24px 28px',
-          backgroundColor: '#FFFFFF',
+          background: 'linear-gradient(180deg, #F0F6FE 0%, #FFFFFF 100%)',
           border: '1px solid #D6E4F8',
+          borderRadius: '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <Store size={22} color="#3A74C2" />
-          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#2A3C5B' }}>
-            BIS Licensed Jewellers Registry
-          </h1>
-        </div>
-        <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-          Published directory of jewellers holding valid BIS hallmarking registrations. Powered by <code>GET /api/jewellers</code>.
-        </p>
-
-        {/* Search */}
-        <div style={{ position: 'relative', width: '100%', marginTop: '16px', marginBottom: '14px' }}>
-          <Search
-            size={18}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+          <div
             style={{
-              position: 'absolute',
-              left: '14px',
-              top: '50%',
-              transform: 'translateY(-50%)',
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              backgroundColor: '#EAF2FE',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               color: '#3A74C2',
+              border: '1px solid #C4DCFA',
             }}
-          />
+          >
+            <Store size={24} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#1D2B42' }}>
+              BIS Licensed Jewellers Registry
+            </h1>
+            <p style={{ fontSize: '13px', color: '#64748B' }}>
+              Directory of jewellers holding valid BIS hallmarking registrations for gold and silver jewellery.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Search & Filters (Per Section 10) */}
+      <div
+        className="card"
+        style={{
+          padding: '18px 20px',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #D6E4F8',
+          borderRadius: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+        }}
+      >
+        <div style={{ position: 'relative', width: '100%' }}>
+          <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#3A74C2' }} />
           <input
             type="text"
             placeholder="Search by jeweller brand name, licence number (HM/C-...), or city..."
@@ -89,18 +132,18 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
               width: '100%',
               height: '44px',
               paddingLeft: '44px',
-              paddingRight: '16px',
-              fontSize: '13.5px',
+              paddingRight: '14px',
+              fontSize: '14px',
               backgroundColor: '#F8FAFD',
-              border: '1px solid #D6E4F8',
-              borderRadius: '8px',
+              border: '1px solid #C4DCFA',
+              borderRadius: '10px',
+              color: '#1D2B42',
             }}
           />
         </div>
 
-        {/* Filters */}
         <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>State:</span>
             <select
               value={selectedState}
@@ -114,15 +157,31 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
               }}
             >
               {states.map((s) => (
-                <option key={s} value={s}>
-                  {s === 'ALL' ? 'All States' : s}
-                </option>
+                <option key={s} value={s}>{s === 'ALL' ? 'All States' : s}</option>
               ))}
             </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Category:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>City:</span>
+            <input
+              type="text"
+              placeholder="Filter city..."
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              style={{
+                padding: '6px 10px',
+                fontSize: '12px',
+                borderRadius: '6px',
+                border: '1px solid #D6E4F8',
+                backgroundColor: '#FFFFFF',
+                width: '130px',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Metal Category:</span>
             <select
               value={selectedMetal}
               onChange={(e) => setSelectedMetal(e.target.value)}
@@ -135,33 +194,30 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
               }}
             >
               {metals.map((m) => (
-                <option key={m} value={m}>
-                  {m === 'ALL' ? 'All Metals' : m}
-                </option>
+                <option key={m} value={m}>{m === 'ALL' ? 'All Categories' : m}</option>
               ))}
             </select>
           </div>
 
           <span style={{ fontSize: '12px', color: '#64748B', marginLeft: 'auto' }}>
-            Endpoint: <code>GET /api/jewellers</code>
+            Showing <strong>{jewellers.length}</strong> licensed jewellers
           </span>
         </div>
       </div>
 
       {/* Content Area */}
       {isLoading ? (
-        <LoadingSkeleton type="table" count={2} message="Loading licensed jewellers from GET /api/jewellers..." />
-      ) : error ? (
-        <ErrorState message={error} onRetry={fetchJewellers} apiEndpoint="GET /api/jewellers" />
+        <LoadingSkeleton type="table" count={3} message="Loading licensed jewellers..." />
       ) : jewellers.length === 0 ? (
         <EmptyState
           icon={Store}
           title="No licensed jeweller records found"
-          description="Jeweller registration information will appear here once connected to GET /api/jewellers."
-          actionText="Clear Filters"
+          description="Try broadening your search or resetting the state filter."
+          actionText="Reset Filters"
           onAction={() => {
             setSearchQuery('');
             setSelectedState('ALL');
+            setSelectedCity('');
             setSelectedMetal('ALL');
           }}
         />
@@ -170,11 +226,12 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
           <table className="data-table">
             <thead>
               <tr>
-                <th>Jeweller Entity Name</th>
+                <th>Jeweller Name</th>
                 <th>Licence Number</th>
-                <th>City / State</th>
+                <th>City & State</th>
                 <th>Address</th>
-                <th>Metal Category</th>
+                <th>Product / Metal Category</th>
+                <th>Contact Information</th>
                 <th>Status</th>
                 <th>Validity</th>
               </tr>
@@ -182,21 +239,30 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
             <tbody>
               {jewellers.map((j) => (
                 <tr key={j.id}>
-                  <td style={{ fontWeight: 700, color: '#2A3C5B' }}>{j.jewellerName}</td>
+                  <td style={{ fontWeight: 800, color: '#1D2B42' }}>
+                    {j.jewellerName}
+                  </td>
                   <td>
                     <span style={{ fontWeight: 700, color: '#3A74C2', fontSize: '13px' }}>
                       {j.licenceNo}
                     </span>
                   </td>
-                  <td>{j.city}, {j.state}</td>
-                  <td style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px' }}>{j.address}</td>
+                  <td>
+                    <span style={{ fontWeight: 600, color: '#1E293B' }}>{j.city}</span>, {j.state}
+                  </td>
+                  <td style={{ fontSize: '12px', color: '#64748B', maxWidth: '240px' }}>
+                    {j.address}
+                  </td>
                   <td>
                     <span className="badge badge-sky">{j.metalCategory}</span>
+                  </td>
+                  <td style={{ fontSize: '12px', color: '#475569' }}>
+                    {j.contact || 'Registered with State Branch'}
                   </td>
                   <td>
                     <span className="badge badge-verified">{j.status}</span>
                   </td>
-                  <td style={{ fontSize: '12.5px', color: '#166534', fontWeight: 600 }}>
+                  <td style={{ fontSize: '12.5px', color: '#166534', fontWeight: 700 }}>
                     {j.validTill}
                   </td>
                 </tr>

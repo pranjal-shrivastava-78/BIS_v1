@@ -1,5 +1,5 @@
 /**
- * BIS Intelligent Assistant - Base API Client
+ * BIS Parakh - Base API Client
  * Configured for backend REST integration.
  */
 

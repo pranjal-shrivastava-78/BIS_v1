@@ -64,7 +64,7 @@ export const BisLogo: React.FC<BisLogoProps> = ({
                 letterSpacing: '-0.01em',
               }}
             >
-              Intelligent Assistant
+              Parakh
             </span>
           </div>
           <span
@@ -74,7 +74,7 @@ export const BisLogo: React.FC<BisLogoProps> = ({
               fontWeight: 500,
             }}
           >
-            Bureau of Indian Standards
+            National Standards Portal
           </span>
         </div>
       )}

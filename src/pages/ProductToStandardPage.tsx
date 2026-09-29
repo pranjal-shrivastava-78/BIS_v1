@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import {
   Split,
+  Search,
   CheckCircle2,
   BookOpen,
   Award,
+  Scale,
+  Sparkles,
+  ChevronLeft,
+  ArrowRight,
+  Layers,
   RotateCcw,
 } from 'lucide-react';
 import { NavRoute } from '../types';
 import { standardsService } from '../services/standardsService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { EmptyState } from '../components/common/EmptyState';
 
 interface ProductToStandardPageProps {
   onNavigate: (route: NavRoute, payload?: any) => void;
@@ -18,341 +23,469 @@ interface ProductToStandardPageProps {
 export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
   onNavigate,
 }) => {
-  const [currentStep, setCurrentStep] = useState<number>(1);
-  const [productDescription, setProductDescription] = useState<string>(
-    'I manufacture stainless steel water bottles for domestic and gym use.'
+  const [productName, setProductName] = useState('Stainless Steel Vacuum Insulated Water Bottle');
+  const [productCategory, setProductCategory] = useState('Consumer Utensils / Food Contact');
+  const [description, setDescription] = useState(
+    'Double-walled vacuum insulated flask manufactured from grade 304 stainless steel with a silicone sealing ring, intended for domestic potable beverage storage.'
   );
+  const [optionalKeywords, setOptionalKeywords] = useState('vacuum flask, thermal retention, drop test, SS 304');
 
-  const [attributes, setAttributes] = useState([
-    { key: 'Product Type', value: 'Water Bottle / Flask' },
-    { key: 'Material', value: 'Stainless Steel (SS 304)' },
-    { key: 'Intended Use', value: 'Domestic potable beverage storage' },
-    { key: 'Target Sector', value: 'Consumer Goods / Food Contact' },
-  ]);
+  const [matchingResults, setMatchingResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const [clarifications, setClarifications] = useState({
-    isInsulated: 'yes',
-    isCarbonated: 'no',
-  });
-
-  const [candidateStandards, setCandidateStandards] = useState<any[]>([]);
-  const [isMatching, setIsMatching] = useState(false);
-
-  const sampleProducts = [
-    'I manufacture stainless steel water bottles for domestic and gym use.',
-    'Wooden educational building blocks and puzzle toys for toddlers under 3 years.',
-    'Packaged drinking water in 20-litre sealed jars.',
-    'Rechargeable lithium-ion battery power banks for mobile phones.',
+  const presets = [
+    {
+      name: 'Stainless Steel Water Bottle',
+      category: 'Consumer Utensils',
+      desc: 'Double-walled vacuum insulated bottle manufactured from grade 304 stainless steel with silicone seal.',
+      keywords: 'insulated, vacuum flask, SS 304',
+    },
+    {
+      name: 'Wooden Educational Puzzle Toy',
+      category: 'Child Safety & Toys',
+      desc: 'Wooden building blocks and shape sorter puzzle for children aged 18 to 36 months coated with water-based non-toxic paint.',
+      keywords: 'toys, small parts, lead migration',
+    },
+    {
+      name: 'Packaged Drinking Water (1L)',
+      category: 'Food & Beverages',
+      desc: 'Purified drinking water packaged in sealed food-grade PET bottles treated by reverse osmosis and ozonation.',
+      keywords: 'packaged water, bottle, ozonation',
+    },
+    {
+      name: 'Rechargeable 10000mAh Power Bank',
+      category: 'Electronics & IT Goods',
+      desc: 'Portable secondary lithium-ion battery pack with USB-C power delivery for smartphone recharging.',
+      keywords: 'lithium battery, power bank, CRS',
+    },
+    {
+      name: '3-Pin Domestic 16A Socket & Plug',
+      category: 'Electrical Accessories',
+      desc: 'Flush mounting wall socket-outlet with safety shutters and heavy duty 16A rated plug top.',
+      keywords: 'plug, socket, safety shutter',
+    },
   ];
 
-  const handleRunExtraction = async () => {
-    if (!productDescription.trim()) return;
-    setIsMatching(true);
-    setCurrentStep(2);
+  const handleApplyPreset = (preset: typeof presets[0]) => {
+    setProductName(preset.name);
+    setProductCategory(preset.category);
+    setDescription(preset.desc);
+    setOptionalKeywords(preset.keywords);
+  };
+
+  const handleFindStandards = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!description.trim() && !productName.trim()) return;
+
+    setIsSearching(true);
+    setHasSearched(true);
     try {
-      const results = await standardsService.matchProductToStandards(productDescription);
-      setCandidateStandards(results);
+      const results = await standardsService.matchProductToStandards(
+        `${productName} ${description}`,
+        productCategory,
+        optionalKeywords
+      );
+      setMatchingResults(results);
     } finally {
-      setIsMatching(false);
+      setIsSearching(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Header */}
+    <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Breadcrumb Bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748B' }}>
+        <button
+          onClick={() => onNavigate('/')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            color: '#3A74C2',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <ChevronLeft size={16} /> Home
+        </button>
+        <span>/</span>
+        <span style={{ color: '#1D2B42', fontWeight: 700 }}>Find Applicable Standards</span>
+      </div>
+
+      {/* Header Banner */}
       <div
         className="card"
         style={{
           padding: '24px 28px',
-          backgroundColor: '#FFFFFF',
+          background: 'linear-gradient(180deg, #F0F6FE 0%, #FFFFFF 100%)',
           border: '1px solid #D6E4F8',
+          borderRadius: '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-          <Split size={22} color="#3A74C2" />
-          <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#2A3C5B' }}>
-            Product → Standard Discovery Engine
-          </h1>
-        </div>
-        <p style={{ fontSize: '13.5px', color: '#64748B' }}>
-          Map manufactured or imported products to candidate Indian Standards. Powered by <code>POST /api/standards/match-product</code>.
-        </p>
-
-        {/* Stepper */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginTop: '24px',
-            position: 'relative',
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
           <div
             style={{
-              position: 'absolute',
-              top: '50%',
-              left: '40px',
-              right: '40px',
-              height: '2px',
-              backgroundColor: '#E2EAF5',
-              zIndex: 1,
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              backgroundColor: '#EAF2FE',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#3A74C2',
+              border: '1px solid #C4DCFA',
             }}
-          />
-          {[
-            { step: 1, label: '1. Describe Product' },
-            { step: 2, label: '2. Attributes' },
-            { step: 3, label: '3. Clarifications' },
-            { step: 4, label: '4. Candidate Standards' },
-          ].map((item) => {
-            const isCompleted = currentStep > item.step;
-            const isCurrent = currentStep === item.step;
-            return (
-              <div
-                key={item.step}
-                onClick={() => setCurrentStep(item.step)}
-                style={{
-                  position: 'relative',
-                  zIndex: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  backgroundColor: '#FFFFFF',
-                  padding: '0 8px',
-                }}
-              >
-                <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    backgroundColor: isCurrent ? '#3A74C2' : isCompleted ? '#EAF7EE' : '#F1F5F9',
-                    color: isCurrent ? '#FFFFFF' : isCompleted ? '#166534' : '#64748B',
-                    border: isCurrent
-                      ? '2px solid #3A74C2'
-                      : isCompleted
-                      ? '2px solid #A7F3D0'
-                      : '2px solid #CBD5E1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    marginBottom: '4px',
-                  }}
-                >
-                  {isCompleted ? <CheckCircle2 size={16} /> : item.step}
-                </div>
-                <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: isCurrent ? 700 : 500,
-                    color: isCurrent ? '#2A3C5B' : '#64748B',
-                  }}
-                >
-                  {item.label}
-                </span>
-              </div>
-            );
-          })}
+          >
+            <Split size={24} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#1D2B42' }}>
+              Product → Standard Discovery
+            </h1>
+            <p style={{ fontSize: '13px', color: '#64748B' }}>
+              Find applicable Indian Standards (IS), mandatory Quality Control Orders (QCO), and required certification schemes for your product.
+            </p>
+          </div>
+        </div>
+
+        {/* Preset Chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '16px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Quick Fill Presets:</span>
+          {presets.map((p, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleApplyPreset(p)}
+              style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '4px 12px',
+                borderRadius: '16px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #C4DCFA',
+                color: '#3A74C2',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#EAF2FE';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#FFFFFF';
+              }}
+            >
+              {p.name}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* STEP 1 */}
-      {currentStep === 1 && (
-        <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#2A3C5B', marginBottom: '8px' }}>
-            Step 1: Enter Product Description
-          </h3>
-          <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
-            Describe the product in normal language, including its materials, intended end-use, and key functions:
-          </p>
+      {/* Main Two-Column Layout: Form & Results */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+          gap: '20px',
+        }}
+      >
+        {/* Left Column: Input Form (Per Section 4) */}
+        <div
+          className="card"
+          style={{
+            padding: '24px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #D6E4F8',
+            borderRadius: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <Sparkles size={18} color="#3A74C2" />
+            <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42' }}>
+              Product Parameters
+            </h3>
+          </div>
 
-          <textarea
-            rows={4}
-            value={productDescription}
-            onChange={(e) => setProductDescription(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              fontSize: '13.5px',
-              borderRadius: '8px',
-              border: '1px solid #D6E4F8',
-              backgroundColor: '#F8FAFD',
-              marginBottom: '16px',
-            }}
-          />
+          <form onSubmit={handleFindStandards} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Product Name */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
+                Product Name: <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Stainless Steel Vacuum Water Bottle"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  height: '42px',
+                  padding: '0 14px',
+                  fontSize: '13.5px',
+                  borderRadius: '8px',
+                  border: '1px solid #D6E4F8',
+                  backgroundColor: '#F8FAFD',
+                  color: '#1D2B42',
+                }}
+              />
+            </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#39527B', display: 'block', marginBottom: '8px' }}>
-              Sample product prompts:
-            </span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {sampleProducts.map((p, idx) => (
-                <button
+            {/* Product Category */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
+                Product Category / Sector:
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Consumer Utensils / Food Contact"
+                value={productCategory}
+                onChange={(e) => setProductCategory(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '42px',
+                  padding: '0 14px',
+                  fontSize: '13.5px',
+                  borderRadius: '8px',
+                  border: '1px solid #D6E4F8',
+                  backgroundColor: '#F8FAFD',
+                  color: '#1D2B42',
+                }}
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
+                Description (Materials, Features, Intended Use): <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <textarea
+                rows={4}
+                placeholder="Describe product materials, construction, intended consumer or industrial application..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  fontSize: '13px',
+                  lineHeight: 1.5,
+                  borderRadius: '8px',
+                  border: '1px solid #D6E4F8',
+                  backgroundColor: '#F8FAFD',
+                  color: '#1D2B42',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+
+            {/* Optional Keywords */}
+            <div>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: '#2A3C5B', marginBottom: '6px' }}>
+                Optional Keywords:
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. insulated, vacuum, thermal, SS 304"
+                value={optionalKeywords}
+                onChange={(e) => setOptionalKeywords(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '42px',
+                  padding: '0 14px',
+                  fontSize: '13.5px',
+                  borderRadius: '8px',
+                  border: '1px solid #D6E4F8',
+                  backgroundColor: '#F8FAFD',
+                  color: '#1D2B42',
+                }}
+              />
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isSearching || !productName.trim()}
+              className="btn btn-primary"
+              style={{
+                height: '46px',
+                fontSize: '14px',
+                fontWeight: 700,
+                borderRadius: '10px',
+                marginTop: '6px',
+              }}
+            >
+              <Search size={16} />
+              {isSearching ? 'Analyzing Standards Catalogue...' : 'Find Applicable Standards'}
+            </button>
+          </form>
+        </div>
+
+        {/* Right Column: Matching Standards Output */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {isSearching ? (
+            <LoadingSkeleton type="card" count={2} message="Extracting attributes and querying Indian Standards registry..." />
+          ) : matchingResults.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42' }}>
+                  Matching Standards Identified ({matchingResults.length})
+                </h3>
+                <span style={{ fontSize: '12px', color: '#166534', fontWeight: 700 }}>
+                  High Confidence Match
+                </span>
+              </div>
+
+              {matchingResults.map((s, idx) => (
+                <div
                   key={idx}
-                  onClick={() => setProductDescription(p)}
+                  className="card"
                   style={{
-                    textAlign: 'left',
-                    padding: '8px 12px',
-                    fontSize: '12.5px',
-                    borderRadius: '6px',
-                    backgroundColor: productDescription === p ? '#EAF2FE' : '#F8FAFC',
-                    border: productDescription === p ? '1px solid #3A74C2' : '1px solid #E2EAF5',
-                    color: '#2A3C5B',
+                    padding: '24px',
+                    backgroundColor: '#FFFFFF',
+                    border: '1.5px solid #3A74C2',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
+                    boxShadow: '0 4px 14px rgba(58, 116, 194, 0.08)',
                   }}
                 >
-                  "{p}"
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={handleRunExtraction} className="btn btn-primary">
-              Extract Attributes & Proceed &rarr;
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 2 */}
-      {currentStep === 2 && (
-        <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#2A3C5B', marginBottom: '8px' }}>
-            Step 2: Extracted Technical Attributes
-          </h3>
-          <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
-            Extracted attributes parsed from product description:
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-            {attributes.map((attr, idx) => (
-              <div key={idx} style={{ backgroundColor: '#F8FAFD', border: '1px solid #D6E4F8', borderRadius: '6px', padding: '10px 14px' }}>
-                <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>{attr.key}</div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#2A3C5B' }}>{attr.value}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <button onClick={() => setCurrentStep(1)} className="btn btn-secondary">
-              &larr; Back
-            </button>
-            <button onClick={() => setCurrentStep(3)} className="btn btn-primary">
-              Verify Clarifications &rarr;
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3 */}
-      {currentStep === 3 && (
-        <div className="card" style={{ padding: '24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#2A3C5B', marginBottom: '8px' }}>
-            Step 3: Clarifying Questions
-          </h3>
-          <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
-            Targeted scope questions to distinguish between standard variants:
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
-            <div style={{ backgroundColor: '#F8FAFD', padding: '12px', borderRadius: '6px', border: '1px solid #E2EAF5' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', color: '#2A3C5B', marginBottom: '6px' }}>
-                Is the water bottle double-walled with vacuum insulation?
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                <input
-                  type="radio"
-                  name="insulated"
-                  checked={clarifications.isInsulated === 'yes'}
-                  onChange={() => setClarifications({ ...clarifications, isInsulated: 'yes' })}
-                />
-                <span>Yes, vacuum insulated (IS 17526 candidate)</span>
-              </label>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <button onClick={() => setCurrentStep(2)} className="btn btn-secondary">
-              &larr; Back
-            </button>
-            <button onClick={() => setCurrentStep(4)} className="btn btn-primary">
-              View Candidate Standards &rarr;
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4 */}
-      {currentStep === 4 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="card" style={{ padding: '18px 24px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#2A3C5B' }}>
-                Candidate Indian Standards (API Match Results)
-              </h3>
-              <p style={{ fontSize: '12.5px', color: '#64748B' }}>
-                Wording: <em>Potentially applicable standards</em> based on published BIS scope definitions.
-              </p>
-            </div>
-            <button onClick={() => setCurrentStep(1)} className="btn btn-secondary btn-sm">
-              <RotateCcw size={13} /> Reset
-            </button>
-          </div>
-
-          {candidateStandards.length === 0 ? (
-            <EmptyState
-              icon={BookOpen}
-              title="No candidate standards matched"
-              description="No Indian Standards were returned by the discovery API for this product description."
-              actionText="Refine Description"
-              onAction={() => setCurrentStep(1)}
-            />
-          ) : (
-            candidateStandards.map((cand, idx) => (
-              <div
-                key={idx}
-                className="card"
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #D6E4F8',
-                  padding: '20px 24px',
-                  borderRadius: '10px',
-                  borderLeft: '4px solid #3A74C2',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '17px', fontWeight: 800, color: '#3A74C2' }}>
-                        {cand.isNumber}
-                      </span>
-                      <span className="badge badge-sky">Match: {cand.confidence}%</span>
-                      {cand.qcoMandatory && <span className="badge badge-danger">QCO Mandatory</span>}
+                  {/* Top Bar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '18px', fontWeight: 900, color: '#3A74C2' }}>
+                          {s.isNumber}
+                        </span>
+                        <span className="badge badge-sky">{s.year}</span>
+                        {s.qcoMandatory && <span className="badge badge-danger">Mandatory QCO</span>}
+                      </div>
+                      <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#1D2B42', marginTop: '4px' }}>
+                        {s.title}
+                      </h4>
                     </div>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#2A3C5B' }}>
-                      {cand.title}
-                    </h4>
+
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        backgroundColor: '#DCFCE7',
+                        color: '#166534',
+                        fontWeight: 800,
+                        fontSize: '12px',
+                        borderRadius: '20px',
+                        border: '1px solid #86EFAC',
+                      }}
+                    >
+                      {s.relevance}% Match
+                    </span>
                   </div>
 
-                  <button
-                    onClick={() => onNavigate('certification', cand.isNumber)}
-                    className="btn btn-primary btn-sm"
-                  >
-                    <Award size={14} /> Certification Roadmap
-                  </button>
-                </div>
+                  {/* Relevance & Explanation */}
+                  <div style={{ padding: '12px 14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5', fontSize: '13px', color: '#334155' }}>
+                    <strong>Relevance / Explanation:</strong> {s.explanation}
+                  </div>
 
-                <p style={{ fontSize: '13px', color: '#475569', backgroundColor: '#F8FAFD', padding: '10px 12px', borderRadius: '6px' }}>
-                  <strong>Why it may apply:</strong> {cand.matchReason}
-                </p>
+                  {/* Applicable QCO & Certification Requirement */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                    <div style={{ padding: '12px', backgroundColor: '#FFFBEB', borderRadius: '8px', border: '1px solid #FDE68A' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: '#92400E', textTransform: 'uppercase' }}>
+                        <Scale size={14} /> Applicable QCO Order
+                      </div>
+                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#78350F', marginTop: '4px' }}>
+                        {s.applicableQco}
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '12px', backgroundColor: '#F0F9FF', borderRadius: '8px', border: '1px solid #BAE6FD' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: '#0369A1', textTransform: 'uppercase' }}>
+                        <Award size={14} /> Certification Requirement
+                      </div>
+                      <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#0C4A6E', marginTop: '4px' }}>
+                        {s.certificationRequirement}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Related Standards */}
+                  {s.relatedStandards && s.relatedStandards.length > 0 && (
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>
+                      <strong>Related Standards:</strong> {s.relatedStandards.join(' • ')}
+                    </div>
+                  )}
+
+                  {/* Action CTAs */}
+                  <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => onNavigate('/standards', s.isNumber)}
+                      className="btn btn-primary btn-sm"
+                    >
+                      Open Standard Detail &rarr;
+                    </button>
+                    <button
+                      onClick={() => onNavigate('/certification', s.id || 'is-17526')}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      View Certification Guide
+                    </button>
+                    <button
+                      onClick={() => onNavigate('/laboratories', { standard: s.isNumber })}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Find Testing Labs
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              className="card"
+              style={{
+                padding: '36px 24px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #D6E4F8',
+                borderRadius: '16px',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '340px',
+              }}
+            >
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F0F6FE',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#3A74C2',
+                  marginBottom: '14px',
+                }}
+              >
+                <Split size={26} />
               </div>
-            ))
+              <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#1D2B42', marginBottom: '8px' }}>
+                Discover Applicable Indian Standards
+              </h3>
+              <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '380px', lineHeight: 1.5, marginBottom: '18px' }}>
+                Enter product details on the left or select a quick-fill preset to see matching Indian Standards, applicable QCOs, and certification routes.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleFindStandards()}
+                className="btn btn-primary btn-sm"
+              >
+                Analyze Current Input &rarr;
+              </button>
+            </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
