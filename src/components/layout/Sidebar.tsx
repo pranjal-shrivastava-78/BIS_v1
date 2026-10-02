@@ -18,11 +18,9 @@ import {
   MapPin,
   Camera,
   Calculator,
-  FileText,
-  Image as ImageIcon,
-  Scan,
   Cpu,
   CheckCircle,
+  ShieldAlert,
 } from 'lucide-react';
 import { NavRoute } from '../../types';
 
@@ -188,32 +186,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'ANALYZE',
       items: [
         {
-          id: '/document-analysis',
-          label: 'Document Analyzer',
-          sublabel: 'PDF & Specification Extraction',
-          icon: FileText,
-          matchRoutes: ['/document-analysis', '/document-image-lab', 'document-image-lab', 'documents-analysis'],
-        },
-        {
-          id: '/image-analysis',
-          label: 'Image Analyzer',
-          sublabel: 'Visual Mark Detection',
-          icon: ImageIcon,
-          matchRoutes: ['/image-analysis'],
-        },
-        {
-          id: '/label-scanner',
-          label: 'BIS Label Scanner',
-          sublabel: 'Packaging Mark Verification',
-          icon: Scan,
-          matchRoutes: ['/label-scanner'],
-        },
-        {
-          id: '/assay-explainer',
-          label: 'Assay Report Explainer',
-          sublabel: 'Plain Language Breakdown',
+          id: '/document-image-lab',
+          label: 'Document & Image Lab',
+          sublabel: 'Assay Report Explainer',
           icon: FileSearch,
-          matchRoutes: ['/assay-explainer', '/hallmarking/assay'],
+          matchRoutes: [
+            '/document-image-lab',
+            'document-image-lab',
+            'documents-analysis',
+            '/document-analysis',
+            '/image-analysis',
+            '/label-scanner',
+            '/assay-explainer',
+            '/hallmarking/assay',
+          ],
         },
         {
           id: '/compliance-gap',
@@ -238,15 +224,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
+      title: 'GRIEVANCE & CITIZEN',
+      items: [
+        {
+          id: '/whistleblower',
+          label: 'Whistleblower Grievance',
+          sublabel: 'Report Counterfeits & Fraud',
+          icon: ShieldAlert,
+          matchRoutes: ['/whistleblower', 'whistleblower'],
+        },
+      ],
+    },
+    {
       title: 'ADMIN',
       items: [
         {
           id: '/admin',
           label: 'Admin Dashboard',
-          sublabel: 'Health, Sync & Review',
+          sublabel: 'Health, Sync, Gap & Review',
           icon: Server,
-          badge: 'Demo',
-          matchRoutes: ['/admin', 'admin', 'admin-dashboard', '/admin/health', '/admin/sync', '/admin/review'],
+          badge: 'Staff',
+          matchRoutes: ['/admin', 'admin', 'admin-dashboard', '/admin/health', '/admin/sync', '/admin/gap-report', '/admin/review'],
         },
       ],
     },

@@ -59,7 +59,7 @@ export const SourceEvidenceCard: React.FC<SourceEvidenceCardProps> = ({
               {citation.documentTitle}
             </h4>
             <div style={{ fontSize: '12px', color: '#3A74C2', fontWeight: 600 }}>
-              {citation.isNumber} ({citation.versionYear})
+              {citation.isNumber}{citation.versionYear ? ` (${citation.versionYear})` : ''}
             </div>
           </div>
         </div>
@@ -116,15 +116,17 @@ export const SourceEvidenceCard: React.FC<SourceEvidenceCardProps> = ({
           gap: '8px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Calendar size={12} />
-          <span>Retrieved: {citation.retrievedDate}</span>
-        </div>
+        {citation.retrievedDate && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Calendar size={12} />
+            <span>Retrieved: {citation.retrievedDate}</span>
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {onOpenStandard && (
+          {onOpenStandard && citation.isNumber && (
             <button
-              onClick={() => onOpenStandard(citation.isNumber)}
+              onClick={() => onOpenStandard(citation.isNumber!)}
               style={{
                 color: '#3A74C2',
                 fontWeight: 600,
@@ -138,21 +140,23 @@ export const SourceEvidenceCard: React.FC<SourceEvidenceCardProps> = ({
             </button>
           )}
 
-          <a
-            href={citation.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: '#3A74C2',
-              fontWeight: 600,
-              fontSize: '11.5px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            BIS Portal <ExternalLink size={11} />
-          </a>
+          {citation.sourceUrl && (
+            <a
+              href={citation.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#3A74C2',
+                fontWeight: 600,
+                fontSize: '11.5px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              BIS Portal <ExternalLink size={11} />
+            </a>
+          )}
         </div>
       </div>
     </div>

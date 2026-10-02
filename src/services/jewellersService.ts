@@ -3,10 +3,9 @@ import { jewellersApi, JewellersFilterParams } from '../api/jewellers';
 import { JewellerOut } from '../types/api';
 
 export interface JewellerQueryParams {
-  query?: string;
   state?: string;
   city?: string;
-  metal?: string;
+  status?: string;
   page?: number;
   pageSize?: number;
 }
@@ -22,15 +21,14 @@ export interface PaginatedJewellersResult {
 }
 
 export function mapJewellerOutToLicensedJeweller(j: JewellerOut): LicensedJeweller {
-  const metal: 'Gold' | 'Silver' | 'Both' =
-    j.metal_category === 'SILVER' ? 'Silver' : j.metal_category === 'BOTH' ? 'Both' : 'Gold';
-
-  const statusFormatted: 'OPERATIVE' | 'SURRENDERED' | 'CANCELLED' =
-    j.status === 'VALID' || j.status === 'OPERATIVE'
-      ? 'OPERATIVE'
-      : j.status === 'SURRENDERED'
-      ? 'SURRENDERED'
-      : 'CANCELLED';
+  let metalCategory: 'Gold' | 'Silver' | 'Both' | string | undefined = undefined;
+  if (j.metal_category) {
+    const upper = j.metal_category.toUpperCase();
+    if (upper === 'SILVER') metalCategory = 'Silver';
+    else if (upper === 'BOTH') metalCategory = 'Both';
+    else if (upper === 'GOLD') metalCategory = 'Gold';
+    else metalCategory = j.metal_category;
+  }
 
   return {
     id: j.id,
@@ -39,8 +37,8 @@ export function mapJewellerOutToLicensedJeweller(j: JewellerOut): LicensedJewell
     address: [j.city, j.district, j.state].filter(Boolean).join(', '),
     city: j.city,
     state: j.state,
-    metalCategory: metal,
-    status: statusFormatted,
+    metalCategory,
+    status: j.status,
   };
 }
 
@@ -49,27 +47,13 @@ export const jewellersService = {
     const apiParams: JewellersFilterParams = {
       state: params?.state && params.state !== 'ALL' ? params.state : undefined,
       city: params?.city && params.city !== 'ALL' ? params.city : undefined,
+      status: params?.status && params.status !== 'ALL' ? params.status : undefined,
       page: params?.page || 1,
       page_size: params?.pageSize || 20,
     };
 
     const res = await jewellersApi.listJewellers(apiParams);
-    let items = res.items.map(mapJewellerOutToLicensedJeweller);
-
-    if (params?.query) {
-      const q = params.query.toLowerCase().trim();
-      items = items.filter(
-        (j) =>
-          j.jewellerName.toLowerCase().includes(q) ||
-          j.licenceNo.toLowerCase().includes(q) ||
-          j.city.toLowerCase().includes(q) ||
-          Boolean(j.address?.toLowerCase().includes(q))
-      );
-    }
-
-    if (params?.metal && params.metal !== 'ALL') {
-      items = items.filter((j) => j.metalCategory === params.metal || j.metalCategory === 'Both');
-    }
+    const items = res.items.map(mapJewellerOutToLicensedJeweller);
 
     return {
       items,

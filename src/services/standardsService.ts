@@ -1,15 +1,14 @@
-import { IndianStandard } from '../types';
+import { IndianStandard, ProductMatchResult } from '../types';
 import { standardsApi, StandardsFilterParams } from '../api/standards';
 import { certificationApi } from '../api/certification';
 import { StandardOut } from '../types/api';
 
 export interface StandardsQueryParams {
   query?: string;
-  department?: string;
-  category?: string;
-  year?: string;
+  search?: string;
+  q?: string;
+  is_number?: string;
   status?: string;
-  qcoOnly?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -25,19 +24,15 @@ export interface PaginatedStandardsResult {
 }
 
 export function mapStandardOutToIndianStandard(std: StandardOut): IndianStandard {
-  const isStatus = (std.status === 'ACTIVE' || std.status === 'UNDER_REVISION' || std.status === 'WITHDRAWN')
-    ? std.status
-    : 'ACTIVE';
-
   return {
     id: std.id,
     isNumber: std.is_number,
     title: std.title,
     year: std.year ? String(std.year) : undefined,
-    status: isStatus,
+    status: std.status,
     scope: std.scope || undefined,
     bisSourceUrl: std.source_url || undefined,
-    sourceReference: std.source_name,
+    sourceReference: std.source_name || undefined,
     lastUpdated: std.last_verified_at ? new Date(std.last_verified_at).toLocaleDateString() : undefined,
   };
 }
@@ -47,8 +42,10 @@ export const standardsService = {
    * Fetch paginated standards directly from backend API
    */
   getPaginatedStandards: async (params?: StandardsQueryParams): Promise<PaginatedStandardsResult> => {
+    const rawSearch = params?.query?.trim() || params?.q?.trim() || params?.search?.trim();
     const apiParams: StandardsFilterParams = {
-      search: params?.query?.trim() || undefined,
+      q: rawSearch || undefined,
+      is_number: params?.is_number?.trim() || undefined,
       status: params?.status && params.status !== 'ALL' ? params.status : undefined,
       page: params?.page || 1,
       page_size: params?.pageSize || 20,
@@ -85,7 +82,7 @@ export const standardsService = {
   /**
    * Matches product to candidate standard using backend /certification/map-product endpoint
    */
-  matchProductToStandards: async (description: string, category?: string, keywords?: string) => {
+  matchProductToStandards: async (description: string, category?: string, keywords?: string): Promise<ProductMatchResult[]> => {
     const fullQuery = [description, category, keywords].filter(Boolean).join(' ');
     const mapping = await certificationApi.mapProduct(fullQuery);
 
@@ -103,9 +100,14 @@ export const standardsService = {
         certification_scheme: mapping.certification_scheme,
         certificationRequirement: mapping.certification_scheme,
         confidence: mapping.confidence,
-        relevance: Math.round(mapping.confidence * 100),
+        relevance: mapping.confidence != null ? Math.round(mapping.confidence * 100) : null,
         reasoning: mapping.reasoning,
         explanation: mapping.reasoning,
+        rejectedAlternatives: (mapping.rejected_alternatives ?? []).map((alt) => ({
+          standard_code: alt.standard_code,
+          standard_title: alt.standard_title,
+          reason_rejected: alt.reason_rejected,
+        })),
       },
     ];
   },

@@ -1,12 +1,14 @@
-import { ChatMessage, ConversationHistoryItem } from '../types';
+import { ChatMessage, ChatPersona, ConversationHistoryItem } from '../types';
 import { chatApi } from '../api/chat';
+import { ChatCitation } from '../types/api';
 
 export const chatService = {
   sendMessage: async (
     query: string,
-    conversationId?: string
+    conversationId?: string,
+    persona?: ChatPersona
   ): Promise<ChatMessage & { conversation_id?: string }> => {
-    const res = await chatApi.sendMessage(query, conversationId);
+    const res = await chatApi.sendMessage(query, conversationId, persona);
 
     return {
       id: `msg-${Date.now()}`,
@@ -14,16 +16,14 @@ export const chatService = {
       text: res.answer,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       conversation_id: res.conversation_id,
-      citations: (res.citations || []).map((c: any, i: number) => ({
+      persona,
+      citations: (res.citations || []).map((c: ChatCitation, i: number) => ({
         id: `cit-${i}`,
-        documentTitle: c.document_title || c.title || c.is_number || 'Indian Standard',
-        isNumber: c.standard_number || c.is_number || 'Not available',
-        versionYear: c.year || c.version_year || '',
-        clause: c.clause,
-        sourceName: c.source_name || 'BIS_MANAK_ONLINE',
-        sourceUrl: c.source_url || 'https://standardsbis.bsbedge.com',
-        retrievedDate: new Date().toISOString(),
-        confidence: c.confidence ?? 1.0,
+        documentTitle: c.document_title || 'Indian Standard',
+        isNumber: c.standard_number || undefined,
+        clause: c.clause || undefined,
+        page: c.page !== undefined && c.page !== null ? String(c.page) : undefined,
+        sourceUrl: c.source_url || undefined,
       })),
     };
   },
@@ -48,16 +48,13 @@ export const chatService = {
       timestamp: m.created_at
         ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         : 'Recent',
-      citations: (m.citations || []).map((c, i) => ({
+      citations: (m.citations || []).map((c: ChatCitation, i: number) => ({
         id: `cit-${i}`,
-        documentTitle: c.title || c.is_number || 'Indian Standard',
-        isNumber: c.is_number || 'Not available',
-        versionYear: c.year || c.version_year || '',
-        clause: c.clause,
-        sourceName: c.source_name || 'BIS_MANAK_ONLINE',
-        sourceUrl: c.source_url || 'https://standardsbis.bsbedge.com',
-        retrievedDate: new Date().toISOString(),
-        confidence: c.confidence ?? 1.0,
+        documentTitle: c.document_title || 'Indian Standard',
+        isNumber: c.standard_number || undefined,
+        clause: c.clause || undefined,
+        page: c.page !== undefined && c.page !== null ? String(c.page) : undefined,
+        sourceUrl: c.source_url || undefined,
       })),
     }));
   },

@@ -1,8 +1,12 @@
 import { apiClient, setAuthToken } from './client';
-import { TokenResponse, UserResponse } from '../types/api';
+import { AuthRegistrationRole, TokenResponse, UserResponse } from '../types/api';
 
 export const authApi = {
-  register: async (email: string, password: string, role: string = 'user'): Promise<UserResponse> => {
+  register: async (
+    email: string,
+    password: string,
+    role: AuthRegistrationRole = 'CONSUMER'
+  ): Promise<UserResponse> => {
     return apiClient.post<UserResponse>('/auth/register', { email, password, role });
   },
 

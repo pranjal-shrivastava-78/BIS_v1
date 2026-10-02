@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavRoute, Language } from './types';
+import { NavRoute, Language, NavigationPayload } from './types';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
@@ -17,6 +17,7 @@ import { LicensedJewellerPage } from './pages/LicensedJewellerPage';
 import { VerificationSuitePage } from './pages/VerificationSuitePage';
 import { DocumentImageAnalysisPage } from './pages/DocumentImageAnalysisPage';
 import { ComplianceGapAnalysisPage } from './pages/ComplianceGapAnalysisPage';
+import { WhistleblowerPage } from './pages/WhistleblowerPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 
 export const App: React.FC = () => {
@@ -24,6 +25,7 @@ export const App: React.FC = () => {
   const getRouteFromPath = (path: string): NavRoute => {
     const clean = path.replace(/\/$/, '') || '/';
     if (clean === '/' || clean === '/dashboard') return '/';
+    if (clean === '/login' || clean === 'login') return '/login';
     if (clean === '/chat' || clean === '/ai-assistant') return '/chat';
     if (clean.startsWith('/standards')) return clean as NavRoute;
     if (clean === '/product-to-standard') return '/product-to-standard';
@@ -44,6 +46,7 @@ export const App: React.FC = () => {
       return clean as NavRoute;
     }
     if (clean === '/compliance-gap') return '/compliance-gap';
+    if (clean === '/whistleblower') return '/whistleblower';
     if (clean.startsWith('/admin')) return clean as NavRoute;
     return '/';
   };
@@ -53,6 +56,9 @@ export const App: React.FC = () => {
       case 'dashboard':
       case '/':
         return '/';
+      case 'login':
+      case '/login':
+        return '/login';
       case 'ai-assistant':
       case 'chat':
       case '/chat':
@@ -130,6 +136,9 @@ export const App: React.FC = () => {
       case 'compliance-gap':
       case '/compliance-gap':
         return '/compliance-gap';
+      case 'whistleblower':
+      case '/whistleblower':
+        return '/whistleblower';
       case 'admin-dashboard':
       case 'admin':
       case '/admin':
@@ -138,6 +147,8 @@ export const App: React.FC = () => {
         return '/admin/health';
       case '/admin/sync':
         return '/admin/sync';
+      case '/admin/gap-report':
+        return '/admin/gap-report';
       case '/admin/review':
         return '/admin/review';
       default: {
@@ -150,7 +161,7 @@ export const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<NavRoute>(() => {
     return getRouteFromPath(window.location.pathname);
   });
-  const [routePayload, setRoutePayload] = useState<any>(null);
+  const [routePayload, setRoutePayload] = useState<NavigationPayload>(null);
   const [language, setLanguage] = useState<Language>('en');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -190,6 +201,8 @@ export const App: React.FC = () => {
       document.title = 'BIS Parakh — Document & Image Lab';
     } else if (routeStr.startsWith('/compliance-gap')) {
       document.title = 'BIS Parakh — Compliance Gap Analysis';
+    } else if (routeStr.startsWith('/whistleblower')) {
+      document.title = 'BIS Parakh — Whistleblower Grievance';
     } else if (routeStr.startsWith('/chat') || routeStr === 'ai-assistant') {
       document.title = 'BIS Parakh — AI Assistant';
     } else if (routeStr.startsWith('/admin')) {
@@ -199,7 +212,7 @@ export const App: React.FC = () => {
     }
   }, [currentRoute]);
 
-  const handleNavigate = (route: NavRoute, payload?: any) => {
+  const handleNavigate = (route: NavRoute, payload?: NavigationPayload) => {
     const targetPath = getPathFromRoute(route);
     if (window.location.pathname !== targetPath) {
       window.history.pushState(null, '', targetPath);
@@ -280,7 +293,7 @@ export const App: React.FC = () => {
     ) {
       return (
         <TestingLaboratoriesPage
-          initialFilter={typeof routePayload === 'object' ? routePayload : undefined}
+          initialFilter={routePayload && typeof routePayload === 'object' && 'standard' in routePayload && typeof routePayload.standard === 'string' ? { standard: routePayload.standard } : undefined}
           onNavigate={handleNavigate}
         />
       );
@@ -313,7 +326,7 @@ export const App: React.FC = () => {
       return <HallmarkingJewelleryPage initialSubFeature={initialSubFeature} onNavigate={handleNavigate} />;
     }
 
-    // Document & Image Lab (Document Analyzer, Image Analyzer, BIS Label Scanner, Assay Report Explainer)
+    // Document & Image Lab (Assay Report Explainer)
     if (
       routeStr === 'documents-analysis' ||
       routeStr === 'document-image-lab' ||
@@ -323,11 +336,7 @@ export const App: React.FC = () => {
       routeStr === '/label-scanner' ||
       routeStr === '/assay-explainer'
     ) {
-      let initialTab: 'document' | 'image' | 'label' | 'assay' = 'document';
-      if (routeStr === '/image-analysis') initialTab = 'image';
-      if (routeStr === '/label-scanner') initialTab = 'label';
-      if (routeStr === '/assay-explainer') initialTab = 'assay';
-      return <DocumentImageAnalysisPage initialTab={initialTab} onNavigate={handleNavigate} />;
+      return <DocumentImageAnalysisPage initialTab="assay" onNavigate={handleNavigate} />;
     }
 
     // Compliance Gap Analysis
@@ -335,11 +344,17 @@ export const App: React.FC = () => {
       return <ComplianceGapAnalysisPage onNavigate={handleNavigate} />;
     }
 
+    // Whistleblower Grievance Portal
+    if (routeStr === 'whistleblower' || routeStr === '/whistleblower') {
+      return <WhistleblowerPage onNavigate={handleNavigate} />;
+    }
+
     // Admin Dashboard
     if (routeStr.startsWith('/admin') || routeStr === 'admin' || routeStr === 'admin-dashboard') {
-      let initialTab: 'OVERVIEW' | 'HEALTH' | 'SYNC' | 'ERRORS' | 'REVIEW' = 'OVERVIEW';
+      let initialTab: 'OVERVIEW' | 'HEALTH' | 'SYNC' | 'ERRORS' | 'GAP_REPORT' | 'REVIEW' = 'OVERVIEW';
       if (routeStr === '/admin/health') initialTab = 'HEALTH';
       if (routeStr === '/admin/sync') initialTab = 'SYNC';
+      if (routeStr === '/admin/gap-report') initialTab = 'GAP_REPORT';
       if (routeStr === '/admin/review') initialTab = 'REVIEW';
       return <AdminDashboardPage initialTab={initialTab} onNavigate={handleNavigate} />;
     }

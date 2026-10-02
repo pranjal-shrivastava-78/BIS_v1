@@ -12,7 +12,7 @@ import {
   FileText,
   X,
 } from 'lucide-react';
-import { NavRoute, QcoRecord } from '../types';
+import { NavRoute, NavigationPayload, QcoRecord } from '../types';
 import { qcoService } from '../services/qcoService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
@@ -20,7 +20,7 @@ import { ErrorState } from '../components/common/ErrorState';
 import { Modal } from '../components/common/Modal';
 
 interface QcoRegulationsPageProps {
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
@@ -71,13 +71,17 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
       setQcoRecords(res.items);
       setTotalPages(res.totalPages);
       setTotalItems(res.totalItems);
-    } catch (err: any) {
-      setError(err?.message || 'Unable to connect to BIS Parakh QCO service.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to connect to BIS Parakh QCO service.');
       setQcoRecords([]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedMinistry, selectedStatus, selectedStandard]);
 
   useEffect(() => {
     fetchQco();
@@ -349,6 +353,11 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
                 <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '11.5px', color: '#475569' }}>
                     Effective: <strong>{q.effectiveDate || 'Not available'}</strong>
+                    {q.daysUntilEnforcement != null && (
+                      <span style={{ marginLeft: '6px', color: q.daysUntilEnforcement > 0 ? '#B45309' : '#166534', fontWeight: 600 }}>
+                        ({q.daysUntilEnforcement > 0 ? `${q.daysUntilEnforcement}d until enforcement` : 'Enforced'})
+                      </span>
+                    )}
                   </span>
                   <button
                     onClick={() => setSelectedQco(q)}
@@ -539,11 +548,44 @@ export const QcoRegulationsPage: React.FC<QcoRegulationsPageProps> = ({
                   {selectedQco.effectiveDate || selectedQco.importantDates?.enforcement || 'Not available'}
                 </div>
               </div>
+
+              {selectedQco.msmeMicroDeadline && (
+                <div style={{ padding: '10px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>MSME (MICRO) DEADLINE</div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginTop: '2px' }}>
+                    {selectedQco.msmeMicroDeadline}
+                  </div>
+                </div>
+              )}
+
+              {selectedQco.msmeSmallDeadline && (
+                <div style={{ padding: '10px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>MSME (SMALL) DEADLINE</div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#1D2B42', marginTop: '2px' }}>
+                    {selectedQco.msmeSmallDeadline}
+                  </div>
+                </div>
+              )}
+
+              {selectedQco.daysUntilEnforcement != null && (
+                <div style={{ padding: '10px', backgroundColor: '#F8FAFD', borderRadius: '8px', border: '1px solid #E2EAF5' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>DAYS UNTIL ENFORCEMENT</div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: selectedQco.daysUntilEnforcement > 0 ? '#B45309' : '#166534', marginTop: '2px' }}>
+                    {selectedQco.daysUntilEnforcement}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {selectedQco.exemptionNote && (
+              <div style={{ padding: '10px', backgroundColor: '#FFFBEB', borderRadius: '8px', border: '1px solid #FDE68A', fontSize: '12px', color: '#92400E' }}>
+                <strong>Exemption Note:</strong> {selectedQco.exemptionNote}
+              </div>
+            )}
 
             {/* Source Reference */}
             <div style={{ borderTop: '1px solid #EDF3FB', paddingTop: '10px', fontSize: '11.5px', color: '#64748B' }}>
-              Official Source: <strong>{selectedQco.sourceGazette || selectedQco.sourceReference || 'Official Gazette Repository'}</strong>
+              Official Source: <strong>{selectedQco.sourceGazette || selectedQco.sourceReference || 'Not available'}</strong>
             </div>
           </div>
         </Modal>

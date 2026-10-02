@@ -2,8 +2,10 @@ import { apiClient } from './client';
 import { AHCCentreOut, PaginatedResponse } from '../types/api';
 
 export interface HallmarkingFilterParams {
+  search?: string;
   state?: string;
   city?: string;
+  pincode?: string;
   page?: number;
   page_size?: number;
 }

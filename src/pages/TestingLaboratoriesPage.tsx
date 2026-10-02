@@ -11,7 +11,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react';
-import { NavRoute, TestingLab } from '../types';
+import { NavRoute, NavigationPayload, TestingLab } from '../types';
 import { laboratoriesService } from '../services/laboratoriesService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
@@ -20,7 +20,7 @@ import { Modal } from '../components/common/Modal';
 
 interface TestingLaboratoriesPageProps {
   initialFilter?: { standard?: string };
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = ({
@@ -31,7 +31,11 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
   const [selectedState, setSelectedState] = useState('ALL');
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedStandard, setSelectedStandard] = useState(initialFilter?.standard || 'ALL');
-  const [selectedCapability, setSelectedCapability] = useState('ALL');
+
+  // User-Controlled Geolocation State (Problem 4)
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationNotice, setLocationNotice] = useState<string | null>(null);
 
   const [labs, setLabs] = useState<TestingLab[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,8 +46,39 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
   const [selectedLab, setSelectedLab] = useState<TestingLab | null>(null);
 
   const states = ['ALL', 'Uttar Pradesh', 'Delhi', 'Karnataka', 'Gujarat', 'Haryana', 'Tamil Nadu', 'Telangana', 'Maharashtra'];
-  const capabilities = ['ALL', 'Chemical', 'Mechanical', 'Electrical', 'Microbiological', 'Civil & Building Materials', 'Electronics & Battery Testing', 'Precious Metals'];
   const standardsList = ['ALL', 'IS 17803', 'IS 1417', 'IS 1293', 'IS 16046', 'IS 13252'];
+
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationNotice('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocating(true);
+    setLocationNotice(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+        setIsLocating(false);
+        setLocationNotice(`Location active (${pos.coords.latitude.toFixed(2)}, ${pos.coords.longitude.toFixed(2)}) — Proximity sorted by backend.`);
+        setCurrentPage(1);
+      },
+      (err) => {
+        setIsLocating(false);
+        setUserCoords(null);
+        setLocationNotice(`Location permission denied or unavailable (${err.message}). Continuing without proximity.`);
+      },
+      { timeout: 10000 }
+    );
+  };
+
+  const handleClearLocation = () => {
+    setUserCoords(null);
+    setLocationNotice(null);
+    setCurrentPage(1);
+  };
 
   const fetchLabs = async () => {
     setIsLoading(true);
@@ -53,16 +88,17 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
         query: searchQuery,
         state: selectedState !== 'ALL' ? selectedState : undefined,
         city: selectedCity.trim() || undefined,
-        capability: selectedCapability !== 'ALL' ? selectedCapability : undefined,
         standard: selectedStandard !== 'ALL' ? selectedStandard : undefined,
+        user_lat: userCoords?.lat,
+        user_lng: userCoords?.lng,
         page: currentPage,
         pageSize: 20,
       });
       setLabs(res.items);
       setTotalPages(res.totalPages);
       setTotalItems(res.totalItems);
-    } catch (err: any) {
-      setError(err?.message || 'Unable to connect to BIS Parakh laboratories service.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to connect to BIS Parakh laboratories service.');
       setLabs([]);
     } finally {
       setIsLoading(false);
@@ -70,8 +106,12 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
   };
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedState, selectedCity, selectedStandard, userCoords]);
+
+  useEffect(() => {
     fetchLabs();
-  }, [searchQuery, selectedState, selectedCity, selectedStandard, selectedCapability, currentPage]);
+  }, [searchQuery, selectedState, selectedCity, selectedStandard, userCoords, currentPage]);
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -227,31 +267,54 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
             </select>
           </div>
 
-          {/* Capability */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Capability:</span>
-            <select
-              value={selectedCapability}
-              onChange={(e) => setSelectedCapability(e.target.value)}
+          {/* Geolocation Button (Problem 4) & Capability Note (Problem 5) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={userCoords ? handleClearLocation : handleUseMyLocation}
+              disabled={isLocating}
               style={{
-                padding: '6px 10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
                 fontSize: '12px',
-                borderRadius: '6px',
-                border: '1px solid #D6E4F8',
-                backgroundColor: '#FFFFFF',
-                maxWidth: '220px',
+                fontWeight: 700,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                border: userCoords ? '1px solid #86EFAC' : '1px solid #C4DCFA',
+                backgroundColor: userCoords ? '#DCFCE7' : '#EAF2FE',
+                color: userCoords ? '#166534' : '#1D2B42',
               }}
             >
-              {capabilities.map((c) => (
-                <option key={c} value={c}>{c === 'ALL' ? 'All Capabilities' : c}</option>
-              ))}
-            </select>
+              <MapPin size={14} color={userCoords ? '#166534' : '#3A74C2'} />
+              {isLocating
+                ? 'Acquiring GPS...'
+                : userCoords
+                ? 'Location Active (Reset)'
+                : 'Use My Location'}
+            </button>
           </div>
 
           <span style={{ fontSize: '12px', color: '#64748B', marginLeft: 'auto' }}>
-            Found <strong>{labs.length}</strong> facilities
+            Found <strong>{totalItems || labs.length}</strong> facilities
           </span>
         </div>
+
+        {locationNotice && (
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              backgroundColor: userCoords ? '#F0FDF4' : '#FFFBEB',
+              border: userCoords ? '1px solid #BBF7D0' : '1px solid #FDE68A',
+              color: userCoords ? '#166534' : '#92400E',
+            }}
+          >
+            {locationNotice}
+          </div>
+        )}
       </div>
 
       {/* Laboratories Cards Grid */}
@@ -268,14 +331,15 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
         <EmptyState
           icon={FlaskConical}
           title="No testing laboratories match your filters"
-          description="Try resetting state, city or capability filters."
+          description="Try resetting state, city, or standard filters."
           actionText="Reset Filters"
           onAction={() => {
             setSearchQuery('');
             setSelectedState('ALL');
             setSelectedCity('');
             setSelectedStandard('ALL');
-            setSelectedCapability('ALL');
+            setUserCoords(null);
+            setLocationNotice(null);
             setCurrentPage(1);
           }}
         />
@@ -382,6 +446,11 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
                 <div style={{ borderTop: '1px solid #E2EAF5', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '11.5px', color: '#64748B' }}>
                     Validity: {lab.validity || 'Not available'}
+                    {lab.distanceKm != null && (
+                      <strong style={{ color: '#166534', marginLeft: '8px' }}>
+                        • {lab.distanceKm} km
+                      </strong>
+                    )}
                   </span>
                   <button
                     onClick={() => setSelectedLab(lab)}
@@ -458,6 +527,23 @@ export const TestingLaboratoriesPage: React.FC<TestingLaboratoriesPageProps> = (
               <div style={{ fontSize: '12.5px', color: '#475569', marginTop: '4px' }}>
                 City: <strong>{selectedLab.city}</strong> • State: <strong>{selectedLab.state}</strong>
               </div>
+              {selectedLab.distanceKm != null && (
+                <div style={{ fontSize: '12px', color: '#166534', fontWeight: 700, marginTop: '4px' }}>
+                  Distance: {selectedLab.distanceKm} km
+                </div>
+              )}
+              {selectedLab.mapsUrl && (
+                <div style={{ marginTop: '8px' }}>
+                  <a
+                    href={selectedLab.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '12px', color: '#3A74C2', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    View on Google Maps <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
             </div>
 
             {(selectedLab.contact || selectedLab.email) && (

@@ -6,8 +6,12 @@ export interface LabQueryParams {
   query?: string;
   state?: string;
   city?: string;
-  capability?: string;
   standard?: string;
+  is_number?: string;
+  user_lat?: number;
+  user_lng?: number;
+  userLat?: number;
+  userLng?: number;
   page?: number;
   pageSize?: number;
 }
@@ -23,10 +27,6 @@ export interface PaginatedLaboratoriesResult {
 }
 
 export function mapLaboratoryOutToTestingLab(lab: LaboratoryOut): TestingLab {
-  const labStatus = (lab.status === 'RECOGNIZED' || lab.status === 'AUDIT_PENDING' || lab.status === 'SUSPENDED')
-    ? lab.status
-    : 'RECOGNIZED';
-
   return {
     id: lab.id,
     name: lab.name,
@@ -35,39 +35,40 @@ export function mapLaboratoryOutToTestingLab(lab: LaboratoryOut): TestingLab {
     district: lab.district || undefined,
     city: lab.city,
     address: lab.address || `${lab.city}, ${lab.state}${lab.pincode ? ` - ${lab.pincode}` : ''}`,
-    status: labStatus,
+    status: lab.status,
     validity: lab.valid_until ? `Valid until ${String(lab.valid_until)}` : lab.valid_from ? `Valid from ${String(lab.valid_from)}` : undefined,
+    latitude: lab.latitude,
+    longitude: lab.longitude,
+    distanceKm: lab.distance_km ?? undefined,
+    mapsUrl: lab.maps_url ?? undefined,
   };
 }
 
 export const laboratoriesService = {
   getPaginatedLaboratories: async (params?: LabQueryParams): Promise<PaginatedLaboratoriesResult> => {
+    let isNumber = params?.is_number || (params?.standard && params.standard !== 'ALL' ? params.standard : undefined);
+    if (!isNumber && params?.query) {
+      const q = params.query.trim();
+      if (/^IS\s*\d+/i.test(q) || /^\d{3,5}/.test(q)) {
+        isNumber = q;
+      }
+    }
+
+    const userLat = params?.user_lat ?? params?.userLat;
+    const userLng = params?.user_lng ?? params?.userLng;
+
     const apiParams: LaboratoriesFilterParams = {
       state: params?.state && params.state !== 'ALL' ? params.state : undefined,
       city: params?.city && params.city !== 'ALL' ? params.city : undefined,
-      is_number: params?.standard && params.standard !== 'ALL' ? params.standard : undefined,
+      is_number: isNumber,
+      user_lat: userLat,
+      user_lng: userLng,
       page: params?.page || 1,
       page_size: params?.pageSize || 20,
     };
 
     const res = await laboratoriesApi.listLaboratories(apiParams);
-    let items = res.items.map(mapLaboratoryOutToTestingLab);
-
-    if (params?.query) {
-      const q = params.query.toLowerCase().trim();
-      items = items.filter(
-        (l) =>
-          l.name.toLowerCase().includes(q) ||
-          l.code.toLowerCase().includes(q) ||
-          l.city.toLowerCase().includes(q) ||
-          l.state.toLowerCase().includes(q) ||
-          Boolean(l.address?.toLowerCase().includes(q))
-      );
-    }
-
-    if (params?.capability && params.capability !== 'ALL') {
-      items = items.filter((l) => l.capabilities && l.capabilities.includes(params.capability!));
-    }
+    const items = res.items.map(mapLaboratoryOutToTestingLab);
 
     return {
       items,

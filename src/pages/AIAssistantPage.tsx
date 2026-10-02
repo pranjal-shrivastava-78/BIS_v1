@@ -15,7 +15,8 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { ChatMessage, ConversationHistoryItem, NavRoute, SourceCitation } from '../types';
+import { ChatMessage, ChatPersona, ConversationHistoryItem, NavRoute, SourceCitation, NavigationPayload } from '../types';
+import { ApiError } from '../api/client';
 import { chatService } from '../services/chatService';
 import { SUGGESTED_ASSISTANT_QUESTIONS } from '../data/assistant';
 import { SourceEvidenceCard } from '../components/common/SourceEvidenceCard';
@@ -24,7 +25,7 @@ import { BisLogo } from '../components/common/BisLogo';
 
 interface AIAssistantPageProps {
   initialPrompt?: string;
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
@@ -34,6 +35,13 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   const [conversations, setConversations] = useState<ConversationHistoryItem[]>([]);
   const [isLoadingConvs, setIsLoadingConvs] = useState<boolean>(true);
   const [activeConvId, setActiveConvId] = useState<string | undefined>(undefined);
+  const [persona, setPersona] = useState<ChatPersona>('CONSUMER');
+  const personaRef = useRef<ChatPersona>(persona);
+
+  useEffect(() => {
+    personaRef.current = persona;
+  }, [persona]);
+
   const [showHistorySidebar, setShowHistorySidebar] = useState<boolean>(true);
   const [chatError, setChatError] = useState<string | null>(null);
 
@@ -100,8 +108,14 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
           setSelectedCitation(lastMsgWithCitations.citations[0]);
         }
       }
-    } catch (err: any) {
-      setChatError(err.message || 'Failed to load conversation history from backend.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Failed to load conversation history from backend.';
+      setChatError(message);
     } finally {
       setIsTyping(false);
     }
@@ -111,11 +125,13 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
     const query = (textToSend || inputText).trim();
     if (!query) return;
 
+    const currentPersona = personaRef.current;
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       sender: 'user',
       text: query,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      persona: currentPersona,
     };
 
     setMessages((prev) => [...prev, userMsg]);
@@ -124,7 +140,7 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
     setChatError(null);
 
     try {
-      const aiResponse = await chatService.sendMessage(query, activeConvId);
+      const aiResponse = await chatService.sendMessage(query, activeConvId, currentPersona);
 
       setMessages((prev) => [...prev, aiResponse]);
       if (aiResponse.citations && aiResponse.citations.length > 0) {
@@ -134,8 +150,14 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
         setActiveConvId(aiResponse.conversation_id);
         loadConversations();
       }
-    } catch (err: any) {
-      setChatError(err.message || 'The Parakh AI Assistant service could not be reached. Please check the backend connection and try again.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'The Parakh AI Assistant service could not be reached. Please check the backend connection and try again.';
+      setChatError(message);
     } finally {
       setIsTyping(false);
     }
@@ -151,6 +173,7 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
         sender: 'assistant',
         text: 'New session started. What product, standard, or regulatory query can I help you explore?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        persona: personaRef.current,
       },
     ]);
   };
@@ -165,6 +188,7 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
         sender: 'assistant',
         text: 'Conversation cleared. How can I assist you with Indian Standards today?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        persona: personaRef.current,
       },
     ]);
   };
@@ -190,7 +214,55 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
           <span style={{ color: '#1D2B42', fontWeight: 700 }}>AI Assistant</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Persona Toggle */}
+          <div
+            style={{
+              display: 'inline-flex',
+              backgroundColor: '#F1F5F9',
+              padding: '3px',
+              borderRadius: '8px',
+              border: '1px solid #CBD5E1',
+            }}
+          >
+            <button
+              type="button"
+              id="persona-consumer-btn"
+              onClick={() => setPersona('CONSUMER')}
+              style={{
+                padding: '4px 12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: persona === 'CONSUMER' ? '#FFFFFF' : 'transparent',
+                color: persona === 'CONSUMER' ? '#1E40AF' : '#64748B',
+                boxShadow: persona === 'CONSUMER' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Consumer
+            </button>
+            <button
+              type="button"
+              id="persona-industry-btn"
+              onClick={() => setPersona('INDUSTRY')}
+              style={{
+                padding: '4px 12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: persona === 'INDUSTRY' ? '#FFFFFF' : 'transparent',
+                color: persona === 'INDUSTRY' ? '#1E40AF' : '#64748B',
+                boxShadow: persona === 'INDUSTRY' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                cursor: 'pointer',
+              }}
+            >
+              Industry
+            </button>
+          </div>
+
           <button
             onClick={handleStartNewChat}
             className="btn btn-primary btn-sm"
@@ -358,11 +430,26 @@ Select one of the suggested questions below or enter your inquiry to begin:`,
                           >
                             <div>
                               <strong>{c.documentTitle}</strong> — {c.clause || c.isNumber}
-                              <div style={{ fontSize: '11px', color: '#64748B' }}>{c.sourceName}</div>
+                              {c.page && <span style={{ marginLeft: '4px', color: '#64748B' }}>(Page {c.page})</span>}
+                              {c.sourceName && <div style={{ fontSize: '11px', color: '#64748B' }}>{c.sourceName}</div>}
+                              {c.sourceUrl && (
+                                <div style={{ marginTop: '2px' }}>
+                                  <a
+                                    href={c.sourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ fontSize: '11px', color: '#3A74C2', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                  >
+                                    View Source Document <ExternalLink size={10} />
+                                  </a>
+                                </div>
+                              )}
                             </div>
-                            <span className="badge badge-sky" style={{ fontSize: '10px' }}>
-                              {Math.round(c.confidence * 100)}% Confidence
-                            </span>
+                            {c.confidence != null && (
+                              <span className="badge badge-sky" style={{ fontSize: '10px' }}>
+                                {Math.round(c.confidence * 100)}% Confidence
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>

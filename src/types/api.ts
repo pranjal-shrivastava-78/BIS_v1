@@ -21,7 +21,7 @@ export interface ApiErrorDetail {
   code: string;
   message: string;
   request_id?: string;
-  details?: any;
+  details?: unknown;
 }
 
 export interface ApiErrorEnvelope {
@@ -54,6 +54,11 @@ export interface QCOOut {
   effective_date?: string | null;
   status: string;
   source_url?: string | null;
+  days_until_enforcement?: number;
+  is_enforced?: boolean;
+  msme_micro_deadline?: string | null;
+  msme_small_deadline?: string | null;
+  exemption_note?: string | null;
 }
 
 // 3. Certification Schemes & Product Mapping
@@ -69,6 +74,12 @@ export interface ProductMappingRequest {
   description: string;
 }
 
+export interface RejectedAlternative {
+  standard_code: string;
+  standard_title: string;
+  reason_rejected: string;
+}
+
 export interface ProductMappingResponse {
   candidate_standard: string;
   standard_title: string;
@@ -77,6 +88,7 @@ export interface ProductMappingResponse {
   certification_scheme: string;
   confidence: number;
   reasoning: string;
+  rejected_alternatives?: RejectedAlternative[];
 }
 
 // 4. Laboratories
@@ -92,6 +104,10 @@ export interface LaboratoryOut {
   status: string;
   valid_from?: string | null;
   valid_until?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  distance_km?: number | null;
+  maps_url?: string | null;
 }
 
 // 5. Hallmarking Centres
@@ -103,7 +119,7 @@ export interface AHCCentreOut {
   district?: string | null;
   state: string;
   status: string;
-  metal_capabilities?: string[];
+  metal_capabilities?: string[] | null;
 }
 
 // 6. Licensed Jewellers
@@ -119,15 +135,57 @@ export interface JewellerOut {
 }
 
 // 7. Verification
-export type VerificationStatus = 'VERIFIED' | 'NOT_FOUND' | 'EXPIRED' | 'SUSPENDED' | 'ERROR';
+export type VerificationStatus =
+  | 'UNKNOWN'
+  | 'PENDING'
+  | 'VERIFIED'
+  | 'NOT_VERIFIED'
+  | 'NOT_FOUND'
+  | 'EXPIRED'
+  | 'SUSPENDED'
+  | 'ERROR'
+  | string;
 
-export interface VerificationResponse {
+export interface HUIDVerificationData {
+  huid?: string;
+  jeweller_name?: string;
+  jeweller_registration?: string;
+  ahc_name?: string;
+  ahc_recognition?: string;
+  fineness?: string;
+  article_type?: string;
+  gross_weight?: string;
+  net_weight?: string;
+  hallmarking_date?: string;
+}
+
+export interface LicenceVerificationData {
+  licence_no?: string;
+  grantee_name?: string;
+  is_number?: string;
+  validity?: string;
+}
+
+export interface RNumberVerificationData {
+  r_number?: string;
+  product?: string;
+  is_number?: string;
+  brand?: string;
+}
+
+export type VerificationData =
+  | HUIDVerificationData
+  | LicenceVerificationData
+  | RNumberVerificationData
+  | Record<string, unknown>;
+
+export interface VerificationResponse<T = VerificationData> {
   status: VerificationStatus;
   normalized_identifier: string;
   source_name: string;
   source_url?: string | null;
   retrieved_at: string;
-  data?: Record<string, any> | null;
+  data?: T | null;
   notes?: string | null;
 }
 
@@ -149,22 +207,28 @@ export interface AssayReportData {
 }
 
 // 9. AI Chat Assistant
+export type ChatPersona = 'CONSUMER' | 'INDUSTRY';
+
 export interface ChatRequest {
   message?: string;
   query?: string;
   conversation_id?: string;
+  persona?: ChatPersona;
+}
+
+export interface ChatCitation {
+  document_title?: string;
+  standard_number?: string;
+  clause?: string;
+  page?: string | number;
+  source_url?: string;
+  verified_in_db?: boolean;
 }
 
 export interface ChatResponse {
   conversation_id: string;
   answer: string;
-  citations: Array<{
-    title?: string;
-    is_number?: string;
-    clause?: string;
-    source_url?: string;
-    [key: string]: any;
-  }>;
+  citations: ChatCitation[];
 }
 
 export interface ConversationOut {
@@ -178,11 +242,19 @@ export interface ChatMessageOut {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  citations?: Array<Record<string, any>>;
+  citations?: ChatCitation[];
   created_at?: string | null;
 }
 
 // 10. Authentication
+export type AuthRegistrationRole = 'CONSUMER' | 'INDUSTRY';
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  role: AuthRegistrationRole;
+}
+
 export interface UserResponse {
   id: string;
   email: string;
@@ -217,7 +289,7 @@ export interface SyncErrorOut {
   item_identifier?: string | null;
   error_type: string;
   message: string;
-  raw_payload?: Record<string, any> | null;
+  raw_payload?: Record<string, unknown> | null;
   created_at?: string | null;
 }
 
@@ -245,3 +317,54 @@ export interface TriggerSyncResponse {
   errors: number;
   sync_run_id?: string;
 }
+
+// 12. Whistleblower Grievances
+export type IncidentType =
+  | 'COUNTERFEIT_ISI'
+  | 'FAKE_HUID'
+  | 'UNCERTIFIED_PRODUCT'
+  | 'LAB_REPORT_FRAUD'
+  | string;
+
+export interface WhistleblowerReportRequest {
+  incident_type: IncidentType;
+  suspect_entity: string;
+  location: string;
+  description: string;
+  image_url?: string | null;
+}
+
+export interface WhistleblowerReportResponse {
+  tracking_code: string;
+  status: string;
+  incident_type: IncidentType;
+  message: string;
+}
+
+export interface WhistleblowerDetailResponse {
+  id?: string;
+  tracking_code: string;
+  incident_type: IncidentType;
+  suspect_entity: string;
+  location: string;
+  evidence_text?: string;
+  image_url?: string | null;
+  status: string;
+  created_at?: string;
+}
+
+// 13. Admin Gap Report
+export interface GapReportItem {
+  query: string;
+  frequency: number;
+  category: string;
+  retrieval_score?: number | null;
+  first_timestamp?: string | null;
+  latest_timestamp?: string | null;
+}
+
+export interface GapReportResponse {
+  items: GapReportItem[];
+  total_items?: number;
+}
+

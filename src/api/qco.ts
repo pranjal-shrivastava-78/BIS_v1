@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import { PaginatedResponse, QCOOut } from '../types/api';
 
 export interface QCOFilterParams {
+  product_name?: string;
   ministry?: string;
   status?: string;
   is_number?: string;

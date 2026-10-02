@@ -1,3 +1,12 @@
+/**
+ * PROTOTYPE / DEMONSTRATION MODE ONLY
+ *
+ * This dataset contains self-assessment demonstration profiles for interface evaluation.
+ * - It is not live BIS evaluation data.
+ * - It is not fetched from the live backend.
+ * - It is for demonstration and self-assessment only.
+ */
+
 import { ComplianceGapItem, ComplianceSummary } from '../types';
 
 export interface ProductComplianceProfile {

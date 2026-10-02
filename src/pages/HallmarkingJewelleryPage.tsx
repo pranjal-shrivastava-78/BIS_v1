@@ -2,21 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Gem,
   Search,
-  Upload,
   Camera,
   CheckCircle2,
   AlertTriangle,
-  ShieldCheck,
   MapPin,
   ChevronLeft,
   Calculator,
-  ExternalLink,
-  Sparkles,
-  ArrowRight,
-  Phone,
-  Layers,
 } from 'lucide-react';
-import { NavRoute, HallmarkingCentre } from '../types';
+import { NavRoute, NavigationPayload, HallmarkingCentre } from '../types';
 import { hallmarkingService } from '../services/hallmarkingService';
 import { jewelleryApi } from '../api/jewellery';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
@@ -26,7 +19,7 @@ import { SegmentedControl } from '../components/common/SegmentedControl';
 
 interface HallmarkingJewelleryPageProps {
   initialSubFeature?: 'centres' | 'scanner' | 'purity' | 'huid' | 'assay' | 'jewellers';
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> = ({
@@ -47,7 +40,6 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
   const [ahcSearchQuery, setAhcSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
   const [selectedCity, setSelectedCity] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [ahcs, setAhcs] = useState<HallmarkingCentre[]>([]);
   const [isLoadingAhcs, setIsLoadingAhcs] = useState(true);
   const [ahcError, setAhcError] = useState<string | null>(null);
@@ -65,15 +57,14 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
         query: ahcSearchQuery,
         state: selectedState !== 'ALL' ? selectedState : undefined,
         city: selectedCity.trim() || undefined,
-        status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
         page: currentPage,
         pageSize: 20,
       });
       setAhcs(res.items);
       setTotalPages(res.totalPages);
       setTotalItems(res.totalItems);
-    } catch (err: any) {
-      setAhcError(err?.message || 'Unable to connect to BIS Parakh hallmarking service.');
+    } catch (err: unknown) {
+      setAhcError(err instanceof Error ? err.message : 'Unable to connect to BIS Parakh hallmarking service.');
       setAhcs([]);
     } finally {
       setIsLoadingAhcs(false);
@@ -81,28 +72,34 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
   };
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [ahcSearchQuery, selectedState, selectedCity]);
+
+  useEffect(() => {
     fetchAhcs();
-  }, [ahcSearchQuery, selectedState, selectedCity, selectedStatus, currentPage]);
+  }, [ahcSearchQuery, selectedState, selectedCity, currentPage]);
 
   // ==========================================
   // 2. Hallmark Scanner State (Backend Vision /jewellery/scan)
+  // Strictly renders backend-provided facts without frontend fabrication (Problem 10)
   // ==========================================
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerResult, setScannerResult] = useState<{
-    detectedHallmark: boolean;
-    huid: string;
-    metal: string;
-    purity: string;
-    purityPercent: string;
-    confidence: number;
-    detectedMarks: string[];
-    explanation: string;
+    detected_huid: string | null;
+    detected_fineness: string | null;
+    detected_bis_logo: boolean;
+    confidence_score: number | null;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleScanFile = async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      setScannerError(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the 10MB backend upload limit. Please upload an image under 10MB.`);
+      return;
+    }
+
     const previewUrl = URL.createObjectURL(file);
     setUploadedImage(previewUrl);
     setIsScanning(true);
@@ -111,39 +108,14 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
 
     try {
       const res = await jewelleryApi.scanJewelleryMarks(file);
-      const detectedMarks: string[] = [];
-      if (res.detected_bis_logo) detectedMarks.push('BIS Standard Triangular Mark (Compliant)');
-      if (res.detected_fineness) detectedMarks.push(`Purity / Karatage Mark: ${res.detected_fineness} (IS 1417)`);
-      if (res.detected_huid) detectedMarks.push(`6-Character Alphanumeric Laser HUID: ${res.detected_huid}`);
-
-      const hasMarks = res.detected_bis_logo || Boolean(res.detected_huid) || Boolean(res.detected_fineness);
-      const finenessStr = res.detected_fineness || null;
-
-      let purityPercentStr = 'Not available';
-      let metalStr = 'Not available';
-      if (finenessStr) {
-        metalStr = finenessStr.toLowerCase().includes('silver') ? 'Silver (Ag)' : 'Gold (Au)';
-        if (finenessStr.includes('750')) purityPercentStr = '75.0%';
-        else if (finenessStr.includes('925')) purityPercentStr = '92.5%';
-        else if (finenessStr.includes('916')) purityPercentStr = '91.6%';
-        else if (finenessStr.includes('585')) purityPercentStr = '58.5%';
-        else purityPercentStr = finenessStr;
-      }
-
       setScannerResult({
-        detectedHallmark: hasMarks,
-        huid: res.detected_huid || 'Not identified in image',
-        metal: metalStr,
-        purity: finenessStr || 'Fineness not detected',
-        purityPercent: purityPercentStr,
-        confidence: Math.round(res.confidence_score * 100),
-        detectedMarks: detectedMarks.length > 0 ? detectedMarks : ['Optical edge detection scan complete'],
-        explanation: res.detected_huid
-          ? `Neural vision model successfully identified laser hallmark engraving with HUID "${res.detected_huid}".`
-          : 'Neural vision model evaluated the hallmark engravings against BIS statutory hallmarks criteria.',
+        detected_huid: res.detected_huid || null,
+        detected_fineness: res.detected_fineness || null,
+        detected_bis_logo: Boolean(res.detected_bis_logo),
+        confidence_score: typeof res.confidence_score === 'number' ? Math.round(res.confidence_score * 100) : null,
       });
-    } catch (err: any) {
-      setScannerError(err?.message || 'Vision model processing failed. Please check image quality and try again.');
+    } catch (err: unknown) {
+      setScannerError(err instanceof Error ? err.message : 'Vision model processing failed. Please check image quality and try again.');
     } finally {
       setIsScanning(false);
     }
@@ -372,27 +344,8 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Status:</span>
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  style={{
-                    padding: '6px 10px',
-                    fontSize: '12px',
-                    borderRadius: '6px',
-                    border: '1px solid #D6E4F8',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="OPERATIONAL">Operational</option>
-                  <option value="RECOGNITION_EXPIRED">Expired</option>
-                </select>
-              </div>
-
               <span style={{ fontSize: '12px', color: '#64748B', marginLeft: 'auto' }}>
-                Showing <strong>{ahcs.length}</strong> recognized centres
+                Showing <strong>{totalItems || ahcs.length}</strong> recognized centres
               </span>
             </div>
           </div>
@@ -417,7 +370,6 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
                 setAhcSearchQuery('');
                 setSelectedState('ALL');
                 setSelectedCity('');
-                setSelectedStatus('ALL');
                 setCurrentPage(1);
               }}
             />
@@ -681,68 +633,74 @@ export const HallmarkingJewelleryPage: React.FC<HallmarkingJewelleryPageProps> =
                 }}
               >
                 <div>
-                  <span className="badge badge-verified" style={{ marginBottom: '4px' }}>
-                    <CheckCircle2 size={13} /> Hallmark Verified
+                  <span
+                    className={scannerResult.detected_bis_logo || scannerResult.detected_huid || scannerResult.detected_fineness ? "badge badge-verified" : "badge badge-suspended"}
+                    style={{ marginBottom: '4px' }}
+                  >
+                    {scannerResult.detected_bis_logo || scannerResult.detected_huid || scannerResult.detected_fineness ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+                    {scannerResult.detected_bis_logo || scannerResult.detected_huid || scannerResult.detected_fineness ? 'Optical Marks Detected' : 'No Hallmark Marks Detected'}
                   </span>
                   <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#1D2B42' }}>
-                    Scanner Optical Analysis Results
+                    Scanner Optical Detections
                   </h3>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>CONFIDENCE SCORE</div>
-                  <div style={{ fontSize: '20px', fontWeight: 900, color: '#166534' }}>
-                    {scannerResult.confidence}%
+                {scannerResult.confidence_score !== null && (
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>CONFIDENCE SCORE</div>
+                    <div style={{ fontSize: '20px', fontWeight: 900, color: '#166534' }}>
+                      {scannerResult.confidence_score}%
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Required Outputs Grid */}
+              {/* Backend Provided Scanner Facts Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '20px' }}>
                 <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
                     Detected HUID
                   </div>
-                  <div style={{ fontSize: '22px', fontWeight: 900, color: '#3A74C2', letterSpacing: '0.08em' }}>
-                    {scannerResult.huid}
+                  <div style={{ fontSize: '22px', fontWeight: 900, color: scannerResult.detected_huid ? '#3A74C2' : '#64748B', letterSpacing: '0.08em' }}>
+                    {scannerResult.detected_huid || 'Not detected'}
                   </div>
-                  <button
-                    onClick={() => onNavigate('/verify/huid')}
-                    style={{ marginTop: '6px', fontSize: '12px', color: '#3A74C2', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Verify in HUID Gateway &rarr;
-                  </button>
+                  {scannerResult.detected_huid && (
+                    <button
+                      onClick={() => onNavigate('/verify/huid')}
+                      style={{ marginTop: '6px', fontSize: '12px', color: '#3A74C2', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Verify HUID in Central Database &rarr;
+                    </button>
+                  )}
                 </div>
 
                 <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
-                    Metal & Purity
+                    Detected Fineness
                   </div>
-                  <div style={{ fontSize: '18px', fontWeight: 800, color: '#B45309' }}>
-                    {scannerResult.purity}
+                  <div style={{ fontSize: '18px', fontWeight: 800, color: scannerResult.detected_fineness ? '#B45309' : '#64748B' }}>
+                    {scannerResult.detected_fineness || 'Not detected'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>
-                    Metal: {scannerResult.metal} {scannerResult.purityPercent !== 'Not available' ? `(${scannerResult.purityPercent} Pure)` : ''}
+                    Raw Fineness Mark (from neural detector)
                   </div>
                 </div>
 
                 <div style={{ padding: '16px', backgroundColor: '#F8FAFD', borderRadius: '12px', border: '1px solid #E2EAF5' }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>
-                    Detected Statutory Marks
+                    BIS Logo Detection
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    {scannerResult.detectedMarks.map((m, idx) => (
-                      <div key={idx} style={{ fontSize: '12px', color: '#166534', fontWeight: 600 }}>
-                        ✓ {m}
-                      </div>
-                    ))}
+                    <div style={{ fontSize: '13px', color: scannerResult.detected_bis_logo ? '#166534' : '#64748B', fontWeight: 700 }}>
+                      {scannerResult.detected_bis_logo ? '✓ BIS Standard Triangular Mark: Detected' : '✗ BIS Standard Triangular Mark: Not detected'}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Explanation Text */}
+              {/* Informational Guidance */}
               <div style={{ padding: '14px 16px', backgroundColor: '#F0F9FF', borderRadius: '10px', border: '1px solid #BAE6FD', fontSize: '13px', color: '#0369A1', lineHeight: 1.5 }}>
-                <strong>Scanner Explanation:</strong> {scannerResult.explanation}
+                <strong>Verification Guidance:</strong> Visual marks detected above reflect optical detection model output. An authoritative confirmation of authenticity requires verifying the 6-digit HUID in the Central BIS Hallmarking Database.
               </div>
             </div>
           ) : null}

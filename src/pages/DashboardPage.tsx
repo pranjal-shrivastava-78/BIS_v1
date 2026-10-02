@@ -17,12 +17,12 @@ import {
   Building2,
   BadgeCheck,
 } from 'lucide-react';
-import { NavRoute } from '../types';
+import { NavRoute, NavigationPayload } from '../types';
 import { BisLogo } from '../components/common/BisLogo';
 import { SUGGESTED_ASSISTANT_QUESTIONS } from '../data/assistant';
 
 interface DashboardPageProps {
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {

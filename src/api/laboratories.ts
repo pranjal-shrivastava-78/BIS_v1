@@ -5,6 +5,8 @@ export interface LaboratoriesFilterParams {
   state?: string;
   city?: string;
   is_number?: string;
+  user_lat?: number;
+  user_lng?: number;
   page?: number;
   page_size?: number;
 }

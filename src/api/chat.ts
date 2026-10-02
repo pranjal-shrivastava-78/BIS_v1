@@ -1,12 +1,18 @@
 import { apiClient } from './client';
-import { ChatMessageOut, ChatResponse, ConversationOut } from '../types/api';
+import { ChatMessageOut, ChatPersona, ChatRequest, ChatResponse, ConversationOut } from '../types/api';
 
 export const chatApi = {
-  sendMessage: async (message: string, conversationId?: string): Promise<ChatResponse> => {
-    return apiClient.post<ChatResponse>('/chat', {
+  sendMessage: async (
+    message: string,
+    conversationId?: string,
+    persona: ChatPersona = 'CONSUMER'
+  ): Promise<ChatResponse> => {
+    const payload: ChatRequest = {
       message,
-      conversation_id: conversationId,
-    });
+      conversation_id: conversationId || undefined,
+      persona,
+    };
+    return apiClient.post<ChatResponse>('/chat', payload);
   },
 
   listConversations: async (): Promise<ConversationOut[]> => {

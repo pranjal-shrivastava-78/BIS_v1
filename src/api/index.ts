@@ -10,3 +10,5 @@ export * from './jewellery';
 export * from './chat';
 export * from './auth';
 export * from './admin';
+export * from './whistleblower';
+

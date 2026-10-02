@@ -8,23 +8,23 @@ import {
   ChevronLeft,
   Filter,
 } from 'lucide-react';
-import { NavRoute, LicensedJeweller } from '../types';
+import { NavRoute, LicensedJeweller, NavigationPayload } from '../types';
+import { ApiError } from '../api/client';
 import { jewellersService } from '../services/jewellersService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { EmptyState } from '../components/common/EmptyState';
 import { ErrorState } from '../components/common/ErrorState';
 
 interface LicensedJewellerPageProps {
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
   onNavigate,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
   const [selectedCity, setSelectedCity] = useState('');
-  const [selectedMetal, setSelectedMetal] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
 
   const [jewellers, setJewellers] = useState<LicensedJeweller[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,25 +34,30 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
   const [totalItems, setTotalItems] = useState(0);
 
   const states = ['ALL', 'Delhi', 'Karnataka', 'Maharashtra', 'Tamil Nadu', 'Telangana', 'Rajasthan', 'West Bengal', 'Gujarat'];
-  const metals = ['ALL', 'Gold', 'Silver', 'Both'];
+  const statuses = ['ALL', 'VALID', 'SUSPENDED', 'CANCELLED'];
 
   const fetchJewellers = async () => {
     setIsLoading(true);
     setError(null);
     try {
       const res = await jewellersService.getPaginatedJewellers({
-        query: searchQuery,
         state: selectedState !== 'ALL' ? selectedState : undefined,
         city: selectedCity.trim() || undefined,
-        metal: selectedMetal !== 'ALL' ? selectedMetal : undefined,
+        status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
         page: currentPage,
         pageSize: 20,
       });
       setJewellers(res.items);
       setTotalPages(res.totalPages);
       setTotalItems(res.totalItems);
-    } catch (err: any) {
-      setError(err?.message || 'Unable to connect to BIS Parakh jewellers service.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Unable to connect to BIS Parakh jewellers service.';
+      setError(message);
       setJewellers([]);
     } finally {
       setIsLoading(false);
@@ -60,8 +65,12 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
   };
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedState, selectedCity, selectedStatus]);
+
+  useEffect(() => {
     fetchJewellers();
-  }, [searchQuery, selectedState, selectedCity, selectedMetal, currentPage]);
+  }, [selectedState, selectedCity, selectedStatus, currentPage]);
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -138,9 +147,9 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#3A74C2' }} />
           <input
             type="text"
-            placeholder="Search by jeweller brand name, licence number (HM/C-...), or city..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search jewellers by city (e.g. Mumbai, New Delhi)..."
+            value={selectedCity}
+            onChange={(e) => setSelectedCity(e.target.value)}
             style={{
               width: '100%',
               height: '44px',
@@ -176,28 +185,10 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>City:</span>
-            <input
-              type="text"
-              placeholder="Filter city..."
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              style={{
-                padding: '6px 10px',
-                fontSize: '12px',
-                borderRadius: '6px',
-                border: '1px solid #D6E4F8',
-                backgroundColor: '#FFFFFF',
-                width: '130px',
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Metal Category:</span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#39527B' }}>Status:</span>
             <select
-              value={selectedMetal}
-              onChange={(e) => setSelectedMetal(e.target.value)}
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
               style={{
                 padding: '6px 12px',
                 fontSize: '12px',
@@ -206,8 +197,8 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
                 backgroundColor: '#FFFFFF',
               }}
             >
-              {metals.map((m) => (
-                <option key={m} value={m}>{m === 'ALL' ? 'All Categories' : m}</option>
+              {statuses.map((st) => (
+                <option key={st} value={st}>{st === 'ALL' ? 'All Statuses' : st}</option>
               ))}
             </select>
           </div>
@@ -235,10 +226,9 @@ export const LicensedJewellerPage: React.FC<LicensedJewellerPageProps> = ({
           description="Try broadening your search or resetting the state filter."
           actionText="Reset Filters"
           onAction={() => {
-            setSearchQuery('');
             setSelectedState('ALL');
             setSelectedCity('');
-            setSelectedMetal('ALL');
+            setSelectedStatus('ALL');
             setCurrentPage(1);
           }}
         />

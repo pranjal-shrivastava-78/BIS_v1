@@ -6,6 +6,8 @@ export interface AhcQueryParams {
   state?: string;
   city?: string;
   query?: string;
+  search?: string;
+  pincode?: string;
   status?: string;
   page?: number;
   pageSize?: number;
@@ -32,13 +34,6 @@ export function mapAHCCentreOutToHallmarkingCentre(ahc: AHCCentreOut): Hallmarki
       ? 'Gold (Au)'
       : undefined;
 
-  const statusFormatted: 'OPERATIONAL' | 'RECOGNITION_EXPIRED' | 'AUDIT_IN_PROGRESS' =
-    ahc.status === 'ACTIVE' || ahc.status === 'OPERATIONAL'
-      ? 'OPERATIONAL'
-      : ahc.status === 'AUDIT_IN_PROGRESS'
-      ? 'AUDIT_IN_PROGRESS'
-      : 'RECOGNITION_EXPIRED';
-
   return {
     id: ahc.id,
     name: ahc.name,
@@ -47,36 +42,25 @@ export function mapAHCCentreOutToHallmarkingCentre(ahc: AHCCentreOut): Hallmarki
     city: ahc.city,
     address: [ahc.city, ahc.district, ahc.state].filter(Boolean).join(', '),
     metalCapability: metalCap,
-    status: statusFormatted,
+    metalCapabilities: ahc.metal_capabilities,
+    status: ahc.status,
   };
 }
 
 export const hallmarkingService = {
   getPaginatedAhcCentres: async (params?: AhcQueryParams): Promise<PaginatedAhcResult> => {
+    const rawSearch = params?.search?.trim() || params?.query?.trim();
     const apiParams: HallmarkingFilterParams = {
+      search: rawSearch || undefined,
       state: params?.state && params.state !== 'ALL' ? params.state : undefined,
       city: params?.city && params.city !== 'ALL' ? params.city : undefined,
+      pincode: params?.pincode && params.pincode.trim() ? params.pincode.trim() : undefined,
       page: params?.page || 1,
       page_size: params?.pageSize || 20,
     };
 
     const res = await hallmarkingApi.listCentres(apiParams);
-    let items = res.items.map(mapAHCCentreOutToHallmarkingCentre);
-
-    if (params?.query) {
-      const q = params.query.toLowerCase().trim();
-      items = items.filter(
-        (a) =>
-          a.name.toLowerCase().includes(q) ||
-          a.city.toLowerCase().includes(q) ||
-          a.code.toLowerCase().includes(q) ||
-          a.state.toLowerCase().includes(q)
-      );
-    }
-
-    if (params?.status && params.status !== 'ALL') {
-      items = items.filter((a) => a.status === params.status);
-    }
+    const items = res.items.map(mapAHCCentreOutToHallmarkingCentre);
 
     return {
       items,

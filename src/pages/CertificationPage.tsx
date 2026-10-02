@@ -16,7 +16,8 @@ import {
   Search,
   Scale,
 } from 'lucide-react';
-import { NavRoute, CertificationScheme } from '../types';
+import { NavRoute, CertificationScheme, NavigationPayload } from '../types';
+import { ApiError } from '../api/client';
 import { SegmentedControl } from '../components/common/SegmentedControl';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorState } from '../components/common/ErrorState';
@@ -26,7 +27,7 @@ import { CertificationSchemeOut, ProductMappingResponse } from '../types/api';
 interface CertificationPageProps {
   initialStandardId?: string;
   initialTab?: 'schemes' | 'mapping' | 'roadmap' | 'checklist' | 'guidance';
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 const mapBackendSchemeToViewModel = (s: CertificationSchemeOut): CertificationScheme => {
@@ -64,8 +65,14 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
       if (mapped.length > 0) {
         setSelectedScheme(mapped[0]);
       }
-    } catch (err: any) {
-      setSchemesError(err.message || 'Failed to load certification schemes from Parakh backend.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Failed to load certification schemes from Parakh backend.';
+      setSchemesError(message);
       setSchemes([]);
     } finally {
       setIsLoadingSchemes(false);
@@ -90,8 +97,14 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
     try {
       const res = await certificationApi.mapProduct(q);
       setMappingResult(res);
-    } catch (err: any) {
-      setMappingError(err.message || 'Failed to map product to certification standard.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : 'Failed to map product to certification standard.';
+      setMappingError(message);
       setMappingResult(null);
     } finally {
       setIsMappingLoading(false);
@@ -648,9 +661,9 @@ export const CertificationPage: React.FC<CertificationPageProps> = ({
           ================================================== */}
       {activeTab === 'checklist' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ padding: '10px 14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12.5px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="badge badge-sky" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Local Checklist</span>
-            <span>Interactive self-audit checklist stored locally in browser session to track pre-audit readiness.</span>
+          <div style={{ padding: '12px 16px', backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '13px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="badge badge-warning" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800 }}>Prototype / Demonstration Mode</span>
+            <span>This readiness checklist is for demonstration and self-assessment only. It is not fetched from the live backend and does not represent live BIS evaluation data or formal certification approval.</span>
           </div>
 
           <div className="card" style={{ padding: '28px', backgroundColor: '#FFFFFF', border: '1px solid #D6E4F8', borderRadius: '16px' }}>

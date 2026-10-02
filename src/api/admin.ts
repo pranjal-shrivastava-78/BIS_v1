@@ -1,5 +1,13 @@
 import { apiClient } from './client';
-import { PaginatedResponse, SourceHealthOut, SyncErrorOut, SyncRunOut, TriggerSyncResponse } from '../types/api';
+import {
+  PaginatedResponse,
+  SourceHealthOut,
+  SyncErrorOut,
+  SyncRunOut,
+  TriggerSyncResponse,
+  GapReportItem,
+  GapReportResponse,
+} from '../types/api';
 
 export interface SyncRunsFilterParams {
   dataset?: string;
@@ -30,5 +38,9 @@ export const adminApi = {
 
   triggerSync: async (dataset: string): Promise<TriggerSyncResponse> => {
     return apiClient.post<TriggerSyncResponse>(`/admin/sync/${encodeURIComponent(dataset)}`);
+  },
+
+  getGapReport: async (params?: { limit?: number; offset?: number }): Promise<GapReportResponse | GapReportItem[]> => {
+    return apiClient.get<GapReportResponse | GapReportItem[]>('/admin/gap-report', params);
   },
 };

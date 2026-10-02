@@ -12,13 +12,14 @@ import {
   Layers,
   RotateCcw,
 } from 'lucide-react';
-import { NavRoute } from '../types';
+import { NavRoute, NavigationPayload, ProductMatchResult } from '../types';
 import { standardsService } from '../services/standardsService';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorState } from '../components/common/ErrorState';
+import { RejectedAlternative } from '../types/api';
 
 interface ProductToStandardPageProps {
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
@@ -31,7 +32,7 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
   );
   const [optionalKeywords, setOptionalKeywords] = useState('vacuum flask, thermal retention, drop test, SS 304');
 
-  const [matchingResults, setMatchingResults] = useState<any[]>([]);
+  const [matchingResults, setMatchingResults] = useState<ProductMatchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -90,8 +91,8 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
         optionalKeywords
       );
       setMatchingResults(results);
-    } catch (err: any) {
-      setSearchError(err.message || 'Failed to map product to standards via Parakh backend.');
+    } catch (err: unknown) {
+      setSearchError(err instanceof Error ? err.message : 'Failed to map product to standards via Parakh backend.');
       setMatchingResults([]);
     } finally {
       setIsSearching(false);
@@ -384,25 +385,46 @@ export const ProductToStandardPage: React.FC<ProductToStandardPageProps> = ({
                       </h4>
                     </div>
 
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        backgroundColor: '#DCFCE7',
-                        color: '#166534',
-                        fontWeight: 800,
-                        fontSize: '12px',
-                        borderRadius: '20px',
-                        border: '1px solid #86EFAC',
-                      }}
-                    >
-                      {s.relevance || Math.round((s.confidence || 0) * 100)}% Match
-                    </span>
+                    {(s.confidence != null || s.relevance != null) && (
+                      <span
+                        style={{
+                          padding: '4px 10px',
+                          backgroundColor: '#DCFCE7',
+                          color: '#166534',
+                          fontWeight: 800,
+                          fontSize: '12px',
+                          borderRadius: '20px',
+                          border: '1px solid #86EFAC',
+                        }}
+                      >
+                        {s.relevance ?? Math.round((s.confidence ?? 0) * 100)}% Match
+                      </span>
+                    )}
                   </div>
 
                   {/* Relevance & Reasoning */}
                   <div style={{ padding: '12px 14px', backgroundColor: '#F8FAFD', borderRadius: '10px', border: '1px solid #E2EAF5', fontSize: '13px', color: '#334155' }}>
                     <strong>Reasoning:</strong> {s.reasoning || s.explanation || 'Identified based on product attributes and statutory standards catalog.'}
                   </div>
+
+                  {/* Rejected Alternatives if provided by backend */}
+                  {s.rejectedAlternatives && s.rejectedAlternatives.length > 0 && (
+                    <div style={{ padding: '12px 14px', backgroundColor: '#FFF7ED', borderRadius: '10px', border: '1px solid #FED7AA', fontSize: '12.5px', color: '#9A3412' }}>
+                      <strong style={{ display: 'block', marginBottom: '6px', color: '#C2410C' }}>
+                        Evaluated & Rejected Alternatives:
+                      </strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {s.rejectedAlternatives.map((alt: RejectedAlternative, aIdx: number) => (
+                          <div key={aIdx}>
+                            <span style={{ fontWeight: 700, color: '#9A3412' }}>
+                              {alt.standard_code}:
+                            </span>{' '}
+                            <span>{alt.reason_rejected}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Applicable QCO & Certification Requirement */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>

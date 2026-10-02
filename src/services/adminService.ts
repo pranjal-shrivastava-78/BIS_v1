@@ -3,9 +3,17 @@ import {
   SourceHealthMetric,
   HumanReviewQueueItem,
   SyncErrorRecord,
+  AdminGapReportItem,
 } from '../types';
 import { adminApi } from '../api/admin';
-import { SourceHealthSource, SyncErrorOut, SyncRunOut } from '../types/api';
+import { ApiError } from '../api/client';
+import {
+  SourceHealthSource,
+  SyncErrorOut,
+  SyncRunOut,
+  GapReportItem,
+  GapReportResponse,
+} from '../types/api';
 
 export interface DashboardStats {
   totalSyncRuns: number;
@@ -30,13 +38,13 @@ export function mapSyncRunToAdminSyncRecord(run: SyncRunOut): AdminSyncRecord {
 
   return {
     id: run.id,
-    sourceName: run.source || 'BIS Central Registry / Gazettes',
+    sourceName: run.source || undefined,
     dataType: run.dataset.toUpperCase(),
     recordsAdded: run.records_created,
     recordsUpdated: run.records_updated,
     recordsRemoved: run.records_deactivated,
     status: statusFormatted,
-    lastRun: run.started_at ? new Date(run.started_at).toLocaleString() : 'Recent',
+    lastRun: run.started_at ? new Date(run.started_at).toLocaleString() : 'N/A',
     durationMs,
     completedAt: run.completed_at ? new Date(run.completed_at).toLocaleString() : undefined,
     recordsProcessed: run.records_seen,
@@ -44,12 +52,18 @@ export function mapSyncRunToAdminSyncRecord(run: SyncRunOut): AdminSyncRecord {
 }
 
 export function mapSourceHealthToMetric(s: SourceHealthSource): SourceHealthMetric {
-  const isHealthy = s.status === 'available' || s.status === 'connected' || s.status === 'healthy';
+  const rawStatus = (s.status || '').toUpperCase();
+  const status: 'HEALTHY' | 'WARNING' | 'ERROR' | 'STALE' =
+    rawStatus === 'AVAILABLE' || rawStatus === 'CONNECTED' || rawStatus === 'HEALTHY'
+      ? 'HEALTHY'
+      : rawStatus === 'DEGRADED' || rawStatus === 'WARNING'
+      ? 'WARNING'
+      : 'ERROR';
 
   return {
     name: s.name,
     endpoint: s.endpoint || 'Not available',
-    status: isHealthy ? 'HEALTHY' : 'WARNING',
+    status,
     lastChecked: s.last_checked_at ? new Date(s.last_checked_at).toLocaleTimeString() : 'Not available',
   };
 }
@@ -60,8 +74,26 @@ export function mapSyncErrorToRecord(err: SyncErrorOut): SyncErrorRecord {
     dataset: err.item_identifier || 'GENERAL',
     errorType: err.error_type,
     message: err.message,
-    timestamp: err.created_at ? new Date(err.created_at).toLocaleString() : 'Recent',
+    timestamp: err.created_at ? new Date(err.created_at).toLocaleString() : 'N/A',
   };
+}
+
+export function mapGapReportItem(item: GapReportItem): AdminGapReportItem {
+  return {
+    query: item.query || 'Unknown',
+    frequency: typeof item.frequency === 'number' ? item.frequency : 0,
+    category: item.category || 'Uncategorized',
+    retrievalScore: typeof item.retrieval_score === 'number' ? item.retrieval_score : null,
+    firstTimestamp: item.first_timestamp || null,
+    latestTimestamp: item.latest_timestamp || null,
+  };
+}
+
+export function parseGapReportResponse(res: GapReportResponse | GapReportItem[] | null | undefined): AdminGapReportItem[] {
+  if (!res) return [];
+  if (Array.isArray(res)) return res.map(mapGapReportItem);
+  if (Array.isArray(res.items)) return res.items.map(mapGapReportItem);
+  return [];
 }
 
 export const adminService = {
@@ -80,10 +112,10 @@ export const adminService = {
       totalRecordsProcessed: totalProcessed,
       totalRecordsCreated: totalCreated,
       totalRecordsUpdated: totalUpdated,
-      sourceHealthStatus: health.status.toUpperCase(),
+      sourceHealthStatus: health.status ? health.status.toUpperCase() : 'UNKNOWN',
       activeSourcesCount: activeSources,
       totalSourcesCount: health.sources.length,
-      lastCheckedAt: health.checked_at ? new Date(health.checked_at).toLocaleTimeString() : 'Recent',
+      lastCheckedAt: health.checked_at ? new Date(health.checked_at).toLocaleTimeString() : 'N/A',
     };
   },
 
@@ -102,8 +134,13 @@ export const adminService = {
     return res.items.map(mapSyncErrorToRecord);
   },
 
+  getGapReport: async (params?: { limit?: number; offset?: number }): Promise<AdminGapReportItem[]> => {
+    const res = await adminApi.getGapReport(params);
+    return parseGapReportResponse(res);
+  },
+
   getReviewQueue: async (): Promise<HumanReviewQueueItem[]> => {
-    return [];
+    throw new ApiError('Review Queue unavailable — no backend endpoint is currently provided.', 404, 'NOT_IMPLEMENTED');
   },
 
   triggerSync: async (dataset: string = 'standards') => {
@@ -116,3 +153,4 @@ export const adminService = {
     };
   },
 };
+

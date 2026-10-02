@@ -12,17 +12,17 @@ import {
   Phone,
   Mail,
   Building2,
-  FileCheck,
   LogOut,
 } from 'lucide-react';
-import { NavRoute, Language } from '../../types';
+import { NavRoute, Language, NavigationPayload } from '../../types';
 import { BisLogo } from '../common/BisLogo';
 import { authApi } from '../../api/auth';
+import { getAuthToken } from '../../api/client';
 import { UserResponse } from '../../types/api';
 
 interface HeaderProps {
   currentRoute: NavRoute;
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
   language: Language;
   onLanguageChange: (lang: Language) => void;
   isMobileMenuOpen: boolean;
@@ -30,6 +30,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  currentRoute,
   onNavigate,
   language,
   onLanguageChange,
@@ -45,11 +46,12 @@ export const Header: React.FC<HeaderProps> = ({
   const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [registerRole, setRegisterRole] = useState<'CONSUMER' | 'INDUSTRY'>('CONSUMER');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('bis_auth_token');
+    const token = getAuthToken();
     if (token) {
       authApi.getMe().then(user => {
         setCurrentUser(user);
@@ -59,6 +61,26 @@ export const Header: React.FC<HeaderProps> = ({
       });
     }
   }, []);
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setCurrentUser(null);
+      setAuthError('Your session has expired. Please sign in again.');
+      setShowAuthModal('signin');
+    };
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, []);
+
+  useEffect(() => {
+    if (
+      currentRoute === '/login' ||
+      currentRoute === 'login' ||
+      (typeof window !== 'undefined' && window.location.pathname === '/login')
+    ) {
+      setShowAuthModal('signin');
+    }
+  }, [currentRoute]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -439,6 +461,9 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => {
                   authApi.logout();
                   setCurrentUser(null);
+                  if (String(currentRoute).startsWith('/admin')) {
+                    onNavigate('/');
+                  }
                 }}
                 title="Sign Out"
                 style={{
@@ -599,6 +624,29 @@ export const Header: React.FC<HeaderProps> = ({
                   <Mail size={15} color="#3A74C2" />
                   <span><strong>Complaints:</strong> complaints@bis.gov.in</span>
                 </div>
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    onClick={() => {
+                      setShowHelp(false);
+                      onNavigate('/whistleblower');
+                    }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: '#DC2626',
+                      color: '#FFFFFF',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <ShieldAlert size={14} /> File Whistleblower Grievance &rarr;
+                  </button>
+                </div>
               </div>
 
               <div
@@ -639,7 +687,17 @@ export const Header: React.FC<HeaderProps> = ({
             padding: '16px',
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget) setShowAuthModal(null);
+            if (e.target === e.currentTarget) {
+              setShowAuthModal(null);
+              setAuthError(null);
+              if (
+                currentRoute === '/login' ||
+                currentRoute === 'login' ||
+                (typeof window !== 'undefined' && window.location.pathname === '/login')
+              ) {
+                onNavigate('/');
+              }
+            }
           }}
         >
           <div
@@ -660,7 +718,20 @@ export const Header: React.FC<HeaderProps> = ({
                   {showAuthModal === 'signin' ? 'Sign In to BIS Parakh' : 'Register for BIS Parakh'}
                 </h3>
               </div>
-              <button onClick={() => setShowAuthModal(null)} style={{ color: '#64748B', background: 'none', border: 'none', cursor: 'pointer' }}>
+              <button
+                onClick={() => {
+                  setShowAuthModal(null);
+                  setAuthError(null);
+                  if (
+                    currentRoute === '/login' ||
+                    currentRoute === 'login' ||
+                    (typeof window !== 'undefined' && window.location.pathname === '/login')
+                  ) {
+                    onNavigate('/');
+                  }
+                }}
+                style={{ color: '#64748B', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
                 <X size={20} />
               </button>
             </div>
@@ -696,23 +767,73 @@ export const Header: React.FC<HeaderProps> = ({
                   if (showAuthModal === 'signin') {
                     await authApi.login(authEmail, authPassword);
                   } else {
-                    await authApi.register(authEmail, authPassword, 'user');
+                    await authApi.register(authEmail, authPassword, registerRole);
                     await authApi.login(authEmail, authPassword);
                   }
                   const user = await authApi.getMe();
                   setCurrentUser(user);
                   setShowAuthModal(null);
+                  setAuthEmail('');
+                  setAuthPassword('');
                   if (user.role === 'admin') {
                     onNavigate('/admin');
+                  } else if (
+                    currentRoute === '/login' ||
+                    currentRoute === 'login' ||
+                    (typeof window !== 'undefined' && window.location.pathname === '/login')
+                  ) {
+                    onNavigate('/');
                   }
-                } catch (err: any) {
-                  setAuthError(err.message || 'Authentication failed. Please verify credentials.');
+                } catch (err: unknown) {
+                  setAuthError(err instanceof Error ? err.message : 'Authentication failed. Please verify credentials.');
                 } finally {
                   setAuthLoading(false);
                 }
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
             >
+              {showAuthModal === 'register' && (
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#1D2B42', display: 'block', marginBottom: '6px' }}>
+                    Select Persona / Role
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setRegisterRole('CONSUMER')}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: registerRole === 'CONSUMER' ? '1.5px solid #3A74C2' : '1px solid #D6E4F8',
+                        backgroundColor: registerRole === 'CONSUMER' ? '#EAF2FE' : '#F8FAFD',
+                        color: registerRole === 'CONSUMER' ? '#1D2B42' : '#64748B',
+                      }}
+                    >
+                      Consumer (Citizen)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegisterRole('INDUSTRY')}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: registerRole === 'INDUSTRY' ? '1.5px solid #3A74C2' : '1px solid #D6E4F8',
+                        backgroundColor: registerRole === 'INDUSTRY' ? '#EAF2FE' : '#F8FAFD',
+                        color: registerRole === 'INDUSTRY' ? '#1D2B42' : '#64748B',
+                      }}
+                    >
+                      Industry / Manufacturer
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#1D2B42', display: 'block', marginBottom: '4px' }}>
                   Email Address
@@ -747,7 +868,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="btn btn-primary"
                 style={{ height: '42px', marginTop: '6px', borderRadius: '8px', fontSize: '14px', fontWeight: 700 }}
               >
-                {authLoading ? 'Authenticating with Parakh Backend...' : showAuthModal === 'signin' ? 'Sign In' : 'Create Account'}
+                {authLoading ? 'Authenticating with Parakh Backend...' : showAuthModal === 'signin' ? 'Sign In' : `Create Account (${registerRole})`}
               </button>
             </form>
 

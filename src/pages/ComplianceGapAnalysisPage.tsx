@@ -11,11 +11,11 @@ import {
   Info,
   BadgeAlert,
 } from 'lucide-react';
-import { NavRoute } from '../types';
+import { NavRoute, NavigationPayload } from '../types';
 import { MOCK_COMPLIANCE_PROFILES, ProductComplianceProfile } from '../data/compliance';
 
 interface ComplianceGapAnalysisPageProps {
-  onNavigate: (route: NavRoute, payload?: any) => void;
+  onNavigate: (route: NavRoute, payload?: NavigationPayload) => void;
 }
 
 export const ComplianceGapAnalysisPage: React.FC<ComplianceGapAnalysisPageProps> = ({
@@ -91,7 +91,7 @@ export const ComplianceGapAnalysisPage: React.FC<ComplianceGapAnalysisPageProps>
 
         <div style={{ marginTop: '14px', padding: '12px 16px', backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '10px', fontSize: '13px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span className="badge badge-warning" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 800 }}>Prototype / Demonstration Mode</span>
-          <span>Backend gap-analysis integration is pending. The data shown below is demonstration mock data for interface testing and does not reflect live backend or BIS evaluations.</span>
+          <span>This is for demonstration and self-assessment only. It is not fetched from the live backend and does not represent live BIS evaluation data.</span>
         </div>
       </div>
 

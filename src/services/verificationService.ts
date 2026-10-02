@@ -1,106 +1,68 @@
 import { HuidVerificationResult, LicenceVerificationResult, CrsVerificationResult } from '../types';
 import { verificationApi } from '../api/verification';
-import { VerificationResponse } from '../types/api';
+import {
+  VerificationResponse,
+  HUIDVerificationData,
+  LicenceVerificationData,
+  RNumberVerificationData,
+} from '../types/api';
 
-export function mapVerificationResponseToHuidResult(res: VerificationResponse): HuidVerificationResult {
-  const d = res.data || {};
+export function mapVerificationResponseToHuidResult(res: VerificationResponse<HUIDVerificationData>): HuidVerificationResult {
+  const d = res.data;
   const isVerified = res.status === 'VERIFIED';
 
-  const fineness = d.fineness || undefined;
-  let metal: 'Gold' | 'Silver' | undefined = undefined;
-  if (fineness) {
-    metal = fineness.toLowerCase().includes('silver') ? 'Silver' : 'Gold';
-  }
-
-  let purityPercent: string | undefined = undefined;
-  if (fineness) {
-    if (fineness.includes('750')) purityPercent = '75.0%';
-    else if (fineness.includes('925')) purityPercent = '92.5%';
-    else if (fineness.includes('585')) purityPercent = '58.5%';
-    else if (fineness.includes('916')) purityPercent = '91.6%';
-    else purityPercent = fineness;
-  }
-
   return {
-    huid: res.normalized_identifier,
-    isValidFormat: true,
+    huid: res.normalized_identifier || d?.huid || '',
+    isValidFormat: res.normalized_identifier ? /^[A-Z0-9]{6}$/i.test(res.normalized_identifier) : true,
     isVerifiedLive: isVerified,
-    status: isVerified ? 'VERIFIED' : res.status === 'NOT_FOUND' ? 'NOT_FOUND' : 'UNAVAILABLE',
-    jewellerRegNo: d.jeweller_registration || undefined,
-    jewellerName: d.jeweller_name || undefined,
-    jewellerCity: d.city || undefined,
-    ahcCode: d.ahc_recognition || undefined,
-    ahcName: d.ahc_name || undefined,
-    metalFineness: fineness,
-    metal,
-    purityPercent,
-    hallmarkingDate: d.hallmarking_date || undefined,
-    articleType: d.article_type || undefined,
-    articleWeight: d.gross_weight || undefined,
-    officialSource: res.source_name || 'BIS CARE Portal / Manakonline HUID System',
-    verifiedAt: res.retrieved_at ? new Date(res.retrieved_at).toLocaleString() : new Date().toLocaleString(),
+    status: res.status,
+    jewellerRegNo: d?.jeweller_registration || undefined,
+    jewellerName: d?.jeweller_name || undefined,
+    ahcCode: d?.ahc_recognition || undefined,
+    ahcName: d?.ahc_name || undefined,
+    metalFineness: d?.fineness || undefined,
+    hallmarkingDate: d?.hallmarking_date || undefined,
+    articleType: d?.article_type || undefined,
+    articleWeight: d?.gross_weight || d?.net_weight || undefined,
+    officialSource: res.source_name || undefined,
+    sourceUrl: res.source_url || undefined,
+    verifiedAt: res.retrieved_at ? new Date(res.retrieved_at).toLocaleString() : undefined,
+    retrievedAt: res.retrieved_at || undefined,
     disclaimer: res.notes || undefined,
   };
 }
 
-export function mapVerificationResponseToLicenceResult(res: VerificationResponse): LicenceVerificationResult {
-  const d = res.data || {};
-  const statusFormatted: 'OPERATIVE' | 'EXPIRED' | 'SUSPENDED' | 'NOT_FOUND' =
-    res.status === 'VERIFIED'
-      ? 'OPERATIVE'
-      : res.status === 'EXPIRED'
-      ? 'EXPIRED'
-      : res.status === 'SUSPENDED'
-      ? 'SUSPENDED'
-      : 'NOT_FOUND';
+export function mapVerificationResponseToLicenceResult(res: VerificationResponse<LicenceVerificationData>): LicenceVerificationResult {
+  const d = res.data;
 
   return {
-    licenceNo: res.normalized_identifier,
-    status: statusFormatted,
-    licenseeName: d.grantee_name || d.licensee_name || undefined,
-    factoryAddress: d.factory_address || undefined,
-    isNumber: d.is_number || undefined,
-    productName: d.product_name || undefined,
-    brand: d.brand || undefined,
-    validTill: d.validity || undefined,
-    scheme: 'Scheme-I (Standard Mark / ISI)',
+    licenceNo: res.normalized_identifier || d?.licence_no || '',
+    status: res.status,
+    licenseeName: d?.grantee_name || undefined,
+    isNumber: d?.is_number || undefined,
+    validTill: d?.validity || undefined,
     certificationDetails: res.notes || undefined,
-    officialSource: res.source_name || 'BIS Manakonline Licence Register',
-    verifiedAt: res.retrieved_at ? new Date(res.retrieved_at).toLocaleString() : new Date().toLocaleString(),
+    officialSource: res.source_name || undefined,
+    sourceUrl: res.source_url || undefined,
+    verifiedAt: res.retrieved_at ? new Date(res.retrieved_at).toLocaleString() : undefined,
+    retrievedAt: res.retrieved_at || undefined,
   };
 }
 
-export function mapVerificationResponseToCrsResult(res: VerificationResponse): CrsVerificationResult {
-  const d = res.data || {};
-  const statusFormatted: 'ACTIVE' | 'EXPIRED' | 'INVALID' | 'SUSPENDED' =
-    res.status === 'VERIFIED'
-      ? 'ACTIVE'
-      : res.status === 'EXPIRED'
-      ? 'EXPIRED'
-      : res.status === 'SUSPENDED'
-      ? 'SUSPENDED'
-      : 'INVALID';
-
-  let models: string[] | undefined = undefined;
-  if (Array.isArray(d.models)) {
-    models = d.models;
-  } else if (typeof d.models === 'string') {
-    models = [d.models];
-  } else if (d.model_numbers && Array.isArray(d.model_numbers)) {
-    models = d.model_numbers;
-  }
+export function mapVerificationResponseToCrsResult(res: VerificationResponse<RNumberVerificationData>): CrsVerificationResult {
+  const d = res.data;
 
   return {
-    rNumber: res.normalized_identifier,
-    status: statusFormatted,
-    companyName: d.brand || d.grantee_name || undefined,
-    modelNumbers: models,
-    productCategory: d.product || undefined,
-    isStandard: d.is_number || undefined,
-    validTill: d.validity || undefined,
+    rNumber: res.normalized_identifier || d?.r_number || '',
+    status: res.status,
+    companyName: d?.brand || undefined,
+    productCategory: d?.product || undefined,
+    isStandard: d?.is_number || undefined,
     registrationDetails: res.notes || undefined,
-    officialSource: res.source_name || 'BIS CRS Official Registration Portal',
-    verifiedAt: res.retrieved_at ? new Date(res.retrieved_at).toLocaleString() : new Date().toLocaleString(),
+    officialSource: res.source_name || undefined,
+    sourceUrl: res.source_url || undefined,
+    verifiedAt: res.retrieved_at ? new Date(res.retrieved_at).toLocaleString() : undefined,
+    retrievedAt: res.retrieved_at || undefined,
   };
 }
 

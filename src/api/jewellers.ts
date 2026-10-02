@@ -4,6 +4,7 @@ import { JewellerOut, PaginatedResponse } from '../types/api';
 export interface JewellersFilterParams {
   state?: string;
   city?: string;
+  status?: string;
   page?: number;
   page_size?: number;
 }

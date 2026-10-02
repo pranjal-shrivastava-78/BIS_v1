@@ -4,9 +4,11 @@ import { QCOOut } from '../types/api';
 
 export interface QcoQueryParams {
   query?: string;
+  product_name?: string;
   ministry?: string;
   status?: string;
   standard?: string;
+  is_number?: string;
   page?: number;
   pageSize?: number;
 }
@@ -22,13 +24,6 @@ export interface PaginatedQcoResult {
 }
 
 export function mapQCOOutToQcoRecord(qco: QCOOut): QcoRecord {
-  const isEnforced = qco.status === 'ACTIVE' || qco.status === 'ENFORCED';
-  const statusFormatted: 'ENFORCED' | 'UPCOMING' | 'EXTENDED' = isEnforced
-    ? 'ENFORCED'
-    : qco.status === 'UPCOMING'
-    ? 'UPCOMING'
-    : 'ENFORCED';
-
   return {
     id: qco.id,
     qcoTitle: qco.title,
@@ -38,37 +33,43 @@ export function mapQCOOutToQcoRecord(qco: QCOOut): QcoRecord {
     notificationNo: qco.notification_number || qco.qco_number || undefined,
     notificationDate: qco.notification_date ? String(qco.notification_date) : undefined,
     effectiveDate: qco.effective_date ? String(qco.effective_date) : undefined,
-    status: statusFormatted,
+    status: qco.status,
     applicableProducts: [qco.product_name],
     applicableStandards: [qco.is_number],
     sourceGazette: qco.source_url || undefined,
+    daysUntilEnforcement: qco.days_until_enforcement,
+    isEnforced: qco.is_enforced,
+    msmeMicroDeadline: qco.msme_micro_deadline,
+    msmeSmallDeadline: qco.msme_small_deadline,
+    exemptionNote: qco.exemption_note,
   };
 }
 
 export const qcoService = {
   getPaginatedQcoRecords: async (params?: QcoQueryParams): Promise<PaginatedQcoResult> => {
+    let isNumber = params?.is_number || (params?.standard && params.standard !== 'ALL' ? params.standard : undefined);
+    let productName = params?.product_name?.trim();
+
+    if (params?.query) {
+      const q = params.query.trim();
+      if (/^IS\s*\d+/i.test(q) || /^\d{3,5}/.test(q)) {
+        isNumber = q;
+      } else if (!productName) {
+        productName = q;
+      }
+    }
+
     const apiParams: QCOFilterParams = {
+      product_name: productName || undefined,
       ministry: params?.ministry && params.ministry !== 'ALL' ? params.ministry : undefined,
       status: params?.status && params.status !== 'ALL' ? params.status : undefined,
-      is_number: params?.standard && params.standard !== 'ALL' ? params.standard : undefined,
+      is_number: isNumber,
       page: params?.page || 1,
       page_size: params?.pageSize || 20,
     };
 
     const res = await qcoApi.listQCOs(apiParams);
-    let items = res.items.map(mapQCOOutToQcoRecord);
-
-    if (params?.query) {
-      const q = params.query.toLowerCase().trim();
-      items = items.filter(
-        (item) =>
-          item.product.toLowerCase().includes(q) ||
-          (item.qcoTitle && item.qcoTitle.toLowerCase().includes(q)) ||
-          item.isNumber.toLowerCase().includes(q) ||
-          (item.notificationNo && item.notificationNo.toLowerCase().includes(q)) ||
-          item.ministry.toLowerCase().includes(q)
-      );
-    }
+    const items = res.items.map(mapQCOOutToQcoRecord);
 
     return {
       items,

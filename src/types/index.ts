@@ -1,6 +1,8 @@
 export type NavRoute =
   | 'dashboard'
   | '/'
+  | 'login'
+  | '/login'
   | 'ai-assistant'
   | 'chat'
   | '/chat'
@@ -51,12 +53,15 @@ export type NavRoute =
   | '/assay-explainer'
   | 'compliance-gap'
   | '/compliance-gap'
+  | 'whistleblower'
+  | '/whistleblower'
   | 'admin-dashboard'
   | 'admin'
   | '/admin'
   | '/admin/health'
   | '/admin/sync'
   | '/admin/review'
+  | '/admin/gap-report'
   | 'government-services'
   | '/government-services'
   | 'analysis-tools'
@@ -65,6 +70,8 @@ export type NavRoute =
   | '/administration';
 
 export type Language = 'en' | 'hi' | 'ta' | 'bn' | 'mr';
+
+export type ChatPersona = 'CONSUMER' | 'INDUSTRY';
 
 export type VerificationBadgeType = 
   | 'VERIFIED' 
@@ -75,22 +82,15 @@ export type VerificationBadgeType =
 
 export interface SourceCitation {
   id: string;
-  documentTitle: string;
-  isNumber: string;
-  versionYear: string;
+  documentTitle?: string;
+  isNumber?: string;
+  versionYear?: string;
   clause?: string;
-  page?: string;
-  sourceName: string;
-  sourceUrl: string;
-  retrievedDate: string;
-  confidence: number;
-}
-
-export interface ClauseInfo {
-  clauseNumber: string;
-  title: string;
-  text: string;
-  page: string;
+  page?: string | number;
+  sourceName?: string;
+  sourceUrl?: string;
+  retrievedDate?: string;
+  confidence?: number | null;
 }
 
 export interface IndianStandard {
@@ -98,33 +98,11 @@ export interface IndianStandard {
   isNumber: string;
   title: string;
   year?: string;
-  department?: string;
-  category?: string;
-  status: 'ACTIVE' | 'UNDER_REVISION' | 'WITHDRAWN';
-  qcoMandatory?: boolean;
-  qcoDate?: string;
+  status: 'ACTIVE' | 'UNDER_REVISION' | 'WITHDRAWN' | string;
   scope?: string;
-  description?: string;
-  applicableProducts?: string[];
-  clauses?: ClauseInfo[];
-  amendments?: string[];
-  certificationScheme?: string;
-  relatedStandards?: string[];
   bisSourceUrl?: string;
-  lastUpdated?: string;
-  qcoInfo?: {
-    mandatory?: boolean;
-    orderTitle?: string;
-    ministry?: string;
-    effectiveDate?: string;
-    notificationNo?: string;
-  };
-  certificationInfo?: {
-    scheme?: string;
-    mark?: string;
-    procedure?: string;
-  };
   sourceReference?: string;
+  lastUpdated?: string;
 }
 
 export interface ProductAttribute {
@@ -147,10 +125,13 @@ export interface TestingLab {
   accreditedStandards?: string[];
   services?: string[];
   validity?: string;
-  status: 'RECOGNIZED' | 'AUDIT_PENDING' | 'SUSPENDED';
+  status: 'RECOGNIZED' | 'AUDIT_PENDING' | 'SUSPENDED' | string;
   officialSource?: string;
   lastVerified?: string;
-  distanceKm?: number;
+  distanceKm?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  mapsUrl?: string | null;
 }
 
 export interface HallmarkingCentre {
@@ -164,7 +145,8 @@ export interface HallmarkingCentre {
   contact?: string;
   services?: string[];
   metalCapability?: string;
-  status: 'OPERATIONAL' | 'RECOGNITION_EXPIRED' | 'AUDIT_IN_PROGRESS';
+  metalCapabilities?: string[] | null;
+  status: 'OPERATIONAL' | 'RECOGNITION_EXPIRED' | 'AUDIT_IN_PROGRESS' | string;
   validity?: string;
   officialSource?: string;
   lastVerified?: string;
@@ -180,7 +162,7 @@ export interface LicensedJeweller {
   district?: string;
   contact?: string;
   metalCategory?: string;
-  status: 'OPERATIVE' | 'SURRENDERED' | 'CANCELLED';
+  status: 'OPERATIVE' | 'SURRENDERED' | 'CANCELLED' | string;
   validTill?: string;
   lastSynchronized?: string;
 }
@@ -194,7 +176,7 @@ export interface QcoRecord {
   notificationNo?: string;
   notificationDate?: string;
   effectiveDate?: string;
-  status: 'ENFORCED' | 'UPCOMING' | 'EXTENDED';
+  status: 'ENFORCED' | 'UPCOMING' | 'EXTENDED' | string;
   applicableProducts?: string[];
   applicableStandards?: string[];
   complianceRequirements?: string[];
@@ -206,6 +188,11 @@ export interface QcoRecord {
   sourceGazette?: string;
   sourceReference?: string;
   lastSynchronized?: string;
+  daysUntilEnforcement?: number;
+  isEnforced?: boolean;
+  msmeMicroDeadline?: string | null;
+  msmeSmallDeadline?: string | null;
+  exemptionNote?: string | null;
 }
 
 export interface CertificationScheme {
@@ -230,62 +217,99 @@ export interface ProductCertificationMapping {
   standardTitle: string;
   requiredDocuments?: string[];
   basicProcess?: string[];
+  rejectedAlternatives?: Array<{
+    standard_code: string;
+    standard_title: string;
+    reason_rejected: string;
+  }>;
+}
+
+export interface ProductMatchResult {
+  id: string;
+  candidate_standard: string;
+  isNumber: string;
+  title: string;
+  standard_title: string;
+  is_mandatory: boolean;
+  qcoMandatory: boolean;
+  applicable_qco?: string | null;
+  applicableQco?: string | null;
+  certification_scheme?: string | null;
+  certificationRequirement?: string | null;
+  confidence?: number | null;
+  relevance?: number | null;
+  reasoning?: string | null;
+  explanation?: string | null;
+  rejectedAlternatives: Array<{
+    standard_code: string;
+    standard_title: string;
+    reason_rejected: string;
+  }>;
 }
 
 export interface HuidVerificationResult {
   huid: string;
   isValidFormat: boolean;
   isVerifiedLive: boolean;
-  status: 'VERIFIED' | 'INVALID_FORMAT' | 'NOT_FOUND' | 'UNAVAILABLE';
+  status: 'VERIFIED' | 'INVALID_FORMAT' | 'NOT_FOUND' | 'UNAVAILABLE' | string;
   jewellerRegNo?: string;
   jewellerName?: string;
-  jewellerCity?: string;
   ahcCode?: string;
   ahcName?: string;
   metalFineness?: string; // e.g. "22K (916)"
-  metal?: string; // e.g. "Gold"
-  purityPercent?: string; // e.g. "91.6%"
   hallmarkingDate?: string;
   articleType?: string;
   articleWeight?: string;
   officialSource?: string;
+  sourceUrl?: string;
   verifiedAt?: string;
+  retrievedAt?: string;
   disclaimer?: string;
 }
 
 export interface LicenceVerificationResult {
   licenceNo: string;
-  status: 'OPERATIVE' | 'EXPIRED' | 'SUSPENDED' | 'NOT_FOUND';
+  status: 'OPERATIVE' | 'EXPIRED' | 'SUSPENDED' | 'NOT_FOUND' | string;
   licenseeName?: string;
-  factoryAddress?: string;
   isNumber?: string;
-  productName?: string;
-  brand?: string;
   validTill?: string;
   scheme?: string;
   certificationDetails?: string;
   officialSource?: string;
+  sourceUrl?: string;
   verifiedAt?: string;
+  retrievedAt?: string;
 }
 
 export interface CrsVerificationResult {
   rNumber: string;
-  status: 'ACTIVE' | 'EXPIRED' | 'INVALID' | 'SUSPENDED';
+  status: 'ACTIVE' | 'EXPIRED' | 'INVALID' | 'SUSPENDED' | string;
   companyName?: string;
-  modelNumbers?: string[];
   productCategory?: string;
   isStandard?: string;
-  validTill?: string;
   registrationDetails?: string;
   officialSource?: string;
+  sourceUrl?: string;
   verifiedAt?: string;
+  retrievedAt?: string;
 }
+
+export interface NavigationStatePayload {
+  search?: string;
+  query?: string;
+  standard?: string;
+  initialMessage?: string;
+}
+
+export type NavigationPayload = string | NavigationStatePayload | undefined | null;
 
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  conversation_id?: string;
+  persona?: ChatPersona;
   standard?: {
     isNumber: string;
     title: string;
@@ -295,7 +319,7 @@ export interface ChatMessage {
   actions?: {
     label: string;
     route: NavRoute;
-    payload?: any;
+    payload?: NavigationPayload;
   }[];
   isHallucinationGuard?: boolean;
 }
@@ -329,7 +353,7 @@ export interface ComplianceSummary {
 
 export interface AdminSyncRecord {
   id: string;
-  sourceName: string;
+  sourceName?: string;
   dataType: string;
   recordsAdded?: number;
   recordsUpdated?: number;
@@ -372,3 +396,13 @@ export interface HumanReviewQueueItem {
   status: 'PENDING' | 'IN_REVIEW' | 'RESOLVED';
   confidenceScore: number;
 }
+
+export interface AdminGapReportItem {
+  query: string;
+  frequency: number;
+  category: string;
+  retrievalScore: number | null;
+  firstTimestamp: string | null;
+  latestTimestamp: string | null;
+}
+
